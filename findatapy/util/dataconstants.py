@@ -26,11 +26,11 @@ import keyring
 def path_join(folder, file):
     if 's3://' in folder:
         folder = folder.replace("s3://", "")
-        folder = folder + "/" + file
+        folder = f"{folder}/{file}"
 
         folder = folder.replace("//", "/")
 
-        folder = "s3://" + folder
+        folder = f"s3://{folder}"
 
     else:
         if file[0] == '/':

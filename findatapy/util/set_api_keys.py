@@ -6,6 +6,7 @@ Alternatively, we can set them manually in dataconstants.py or create a datacred
 
 '''
 
+
 import os
 import keyring
 
@@ -14,6 +15,6 @@ service_names = ['Quandl', 'AlphaVantage', 'Twitter App Key',
                  'Twitter OAUTH token Secret', 'FRED']
 
 for s in service_names:
-    key = input("Please enter the %s API key: " % s)
+    key = input(f"Please enter the {s} API key: ")
 
     keyring.set_password(s, os.getlogin(), key)

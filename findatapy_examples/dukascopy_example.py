@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     run_example = 0
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ####### DukasCopy examples
         # let's download data for 14 Jun 2016 for EUR/USD - the raw data has bid/ask, if we specify close, we calculate
         # it as the average
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         df = market.fetch_market(md_request)
         print(df.tail(n=10))
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         ####### Dukascopy S&P500 example
         from findatapy.market import Market, MarketDataRequest, \
             MarketDataGenerator

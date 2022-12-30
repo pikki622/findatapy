@@ -38,7 +38,7 @@ if __name__ == "__main__":
     cache_algo = "cache_algo_return"
 
     ###### Download FX forwards data for EURUSD
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ####### Bloomberg examples (you need to have a Bloomberg Terminal 
         # installed for this to work!)
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         print(df.tail(n=10))
 
     ###### Download FX forwards data for USDBRL
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         ####### Bloomberg examples (you need to have a Bloomberg Terminal 
         # installed for this to work!)
 

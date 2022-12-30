@@ -646,54 +646,53 @@ class Calculations(object):
                 period_shift).values - signal_data_frame.values) * tc)
 
         # Now handle roll costs
-        if rc is not None:
-            if isinstance(rc, dict):
-
-                rc_ind = []
-
-                for k in returns_data_frame.columns:
-                    try:
-                        rc_ind.append(rc[k.split('.')[0]])
-                    except:
-                        rc_ind.append(rc['default'])
-
-                rc_ind = numpy.array(rc_ind)
-
-                rc_costs = (numpy.abs(
-                    signal_data_frame.shift(period_shift).values) * rc_ind)
-            elif isinstance(rc, pd.DataFrame):
-                rc_ind = []
-
-                # Get indices related to the returns
-                for k in returns_data_frame.columns:
-                    try:
-                        rc_ind.append(k.split('.')[0] + ".rc")
-                    except:
-                        rc_ind.append('default.rc')
-
-                # Don't include roll costs at a portfolio level (TODO - weight it according to the assets)
-                rc['Portfolio.rc'] = 0
-
-                # Get associated roll costs time series
-                rc_costs = rc[rc_ind]
-
-                # Make sure transaction costs are aligned to the signals
-                signal_data_frame, rc_costs = signal_data_frame.align(rc_costs,
-                                                                      join='left',
-                                                                      axis='index')
-
-                rc_costs = rc_costs.fillna(0)
-
-                # Calculate the roll costs by multiplying by our position (eg. if position is zero, then no roll cost)
-                rc_costs = (numpy.abs(signal_data_frame.shift(
-                    period_shift).values) * rc_costs.values)
-
-            else:
-                rc_costs = (numpy.abs(
-                    signal_data_frame.shift(period_shift).values) * rc)
-        else:
+        if rc is None:
             rc_costs = 0
 
+        elif isinstance(rc, dict):
+
+            rc_ind = []
+
+            for k in returns_data_frame.columns:
+                try:
+                    rc_ind.append(rc[k.split('.')[0]])
+                except:
+                    rc_ind.append(rc['default'])
+
+            rc_ind = numpy.array(rc_ind)
+
+            rc_costs = (numpy.abs(
+                signal_data_frame.shift(period_shift).values) * rc_ind)
+        elif isinstance(rc, pd.DataFrame):
+            rc_ind = []
+
+            # Get indices related to the returns
+            for k in returns_data_frame.columns:
+                try:
+                    rc_ind.append(k.split('.')[0] + ".rc")
+                except:
+                    rc_ind.append('default.rc')
+
+            # Don't include roll costs at a portfolio level (TODO - weight it according to the assets)
+            rc['Portfolio.rc'] = 0
+
+            # Get associated roll costs time series
+            rc_costs = rc[rc_ind]
+
+            # Make sure transaction costs are aligned to the signals
+            signal_data_frame, rc_costs = signal_data_frame.align(rc_costs,
+                                                                  join='left',
+                                                                  axis='index')
+
+            rc_costs = rc_costs.fillna(0)
+
+            # Calculate the roll costs by multiplying by our position (eg. if position is zero, then no roll cost)
+            rc_costs = (numpy.abs(signal_data_frame.shift(
+                period_shift).values) * rc_costs.values)
+
+        else:
+            rc_costs = (numpy.abs(
+                signal_data_frame.shift(period_shift).values) * rc)
         return pd.DataFrame(
             signal_data_frame.shift(
                 period_shift).values * returns_data_frame.values - tc_costs - rc_costs,
@@ -988,9 +987,7 @@ class Calculations(object):
         # 3. average of non-NaNs
         foo = lambda z: z[pd.notnull(z)].sum()
 
-        rolling_sum = pd.rolling_apply(data_frame, periods, foo, min_periods=1)
-
-        return rolling_sum
+        return pd.rolling_apply(data_frame, periods, foo, min_periods=1)
 
     def rolling_median(self, data_frame, periods):
         """Calculates the rolling moving average
@@ -1097,17 +1094,13 @@ class Calculations(object):
             df = panel
 
         if flatten_labels:
+            new_labels = []
+
             if pairwise:
                 series1 = df.columns.get_level_values(0)
                 series2 = df.columns.get_level_values(1)
-                new_labels = []
-
-                for i in range(len(series1)):
-                    new_labels.append(series1[i] + " v " + series2[i])
-
+                new_labels.extend(series1[i] + " v " + series2[i] for i in range(len(series1)))
             else:
-                new_labels = []
-
                 try:
                     series1 = data_frame1.columns
                 except:
@@ -1115,10 +1108,8 @@ class Calculations(object):
 
                 series2 = data_frame2.columns
 
-                for i in range(len(series1)):
-                    for j in range(len(series2)):
-                        new_labels.append(series1[i] + " v " + series2[j])
-
+                for item in series1:
+                    new_labels.extend(item + " v " + series2[j] for j in range(len(series2)))
             df.columns = new_labels
 
         return df
@@ -1180,7 +1171,7 @@ class Calculations(object):
         # remove any None elements (which can't be joined!)
         df_list = [i for i in df_list if i is not None]
 
-        if len(df_list) == 0:
+        if not df_list:
             return None
         elif len(df_list) == 1:
             return df_list[0]
@@ -1203,22 +1194,18 @@ class Calculations(object):
         # remove any None elements (which can't be joined!)
         df_list = [i for i in df_list if i is not None]
 
-        if len(df_list) == 0:
+        if not df_list:
             return None
 
         elif len(df_list) == 1:
             return df_list[0]
 
-        while (True):
+        while True:
             length = len(df_list)
 
             if length == 1: break
 
-            df_list_out = []
-
-            for i in range(0, length, 2):
-                df_list_out.append(self.join_aux(i, df_list))
-
+            df_list_out = [self.join_aux(i, df_list) for i in range(0, length, 2)]
             df_list = df_list_out
 
         return df_list[0]
@@ -1235,14 +1222,13 @@ class Calculations(object):
         if (len(df_list) < 3):
             return self.join(df_list, how='outer')
 
-        while (True):
+        while True:
             # split into two
             length = len(df_list)
 
             if length == 1: break
 
-            job_args = [(item_a, df_list) for i, item_a in
-                        enumerate(range(0, length, 2))]
+            job_args = [(item_a, df_list) for item_a in range(0, length, 2)]
             df_list = pool.map_async(self.join_aux_helper, job_args).get()
 
         pool.close()
@@ -1278,15 +1264,11 @@ class Calculations(object):
         """
         if df_list is not None:
 
-            # remove and empty dataframes from the list
-            if isinstance(df_list, list):
-                df_list = [x for x in df_list if x is not None]
-                df_list = [x for x in df_list if not x.empty]
-            else:
+            if not isinstance(df_list, list):
                 return df_list
 
-            # only concatenate if any non-empty dataframes are left
-            if len(df_list) > 0:
+            df_list = [x for x in df_list if x is not None]
+            if df_list := [x for x in df_list if not x.empty]:
                 # careful: concatenating DataFrames can change the order, so insist on arranging by old cols
                 old_cols = df_list[0].columns
 
@@ -1315,7 +1297,7 @@ class Calculations(object):
         # remove any None elements (which can't be joined!)
         df_list = [i for i in df_list if i is not None]
 
-        if len(df_list) == 0:
+        if not df_list:
             return None
         elif len(df_list) == 1:
             return df_list[0]
@@ -1395,7 +1377,7 @@ class Calculations(object):
         # remove any None elements (which can't be joined!)
         df_list = [i for i in df_daily_list if i is not None]
 
-        if len(df_list) == 0:
+        if not df_list:
             return None
 
         # df_list = [dd.from_pd(df) for df in df_list]
@@ -1406,10 +1388,9 @@ class Calculations(object):
             else:
                 df_daily = df_list[0].join(df_list[1:], how=daily_how)
 
-            common_cols = [x for x in df_intraday.columns if
-                           x in df_daily.columns]
-
-            if len(common_cols) > 0:
+            if common_cols := [
+                x for x in df_intraday.columns if x in df_daily.columns
+            ]:
                 df_daily = df_daily.drop(common_cols, axis=1)
 
             tz = Timezone()
@@ -1424,15 +1405,16 @@ class Calculations(object):
                 df_daily = tz.convert_index_aware_to_alt(df_daily,
                                                          daily_time_zone)
                 df_daily.index = df_daily.index + pd.Timedelta(
-                    hours=int(daily_time_of_day[0:2]),
-                    minutes=int(daily_time_of_day[3:4]))
+                    hours=int(daily_time_of_day[:2]),
+                    minutes=int(daily_time_of_day[3:4]),
+                )
                 df_daily = tz.convert_index_aware_to_alt(df_daily,
                                                          df_intraday.index.tz)
 
                 return df_intraday.join(df_daily, how='left')
             elif df_daily.empty and not (df_intraday.empty):
                 return df_intraday
-            elif not (df_daily.empty) and df_intraday.empty:
+            elif not df_daily.empty:
                 return df_daily
             else:
                 return None
@@ -1473,7 +1455,7 @@ class Calculations(object):
 
         stats = []
 
-        for i in range(0, len(y_vars)):
+        for i in range(len(y_vars)):
             y = df_y[y_vars[i]]
             x = df_x[x_vars[i]]
 
@@ -1518,21 +1500,20 @@ class Calculations(object):
             for o in ols_list:
                 if o is None:
                     list_o.append(numpy.nan)
+                elif v == 'beta':
+                    list_o.append(o.beta.x)
+                elif v == 'beta_intercept':
+                    list_o.append(o.beta.intercept)
+                elif v == 'r2':
+                    list_o.append(o.r2)
+                elif v == 'r2_adj':
+                    list_o.append(o.r2_adj)
+                elif v == 't_stat':
+                    list_o.append(o.t_stat.x)
+                elif v == 't_stat_intercept':
+                    list_o.append(o.t_stat.intercept)
                 else:
-                    if v == 't_stat':
-                        list_o.append(o.t_stat.x)
-                    elif v == 't_stat_intercept':
-                        list_o.append(o.t_stat.intercept)
-                    elif v == 'beta':
-                        list_o.append(o.beta.x)
-                    elif v == 'beta_intercept':
-                        list_o.append(o.beta.intercept)
-                    elif v == 'r2':
-                        list_o.append(o.r2)
-                    elif v == 'r2_adj':
-                        list_o.append(o.r2_adj)
-                    else:
-                        return None
+                    return None
 
             df[v] = list_o
 
@@ -1757,7 +1738,7 @@ class Calculations(object):
         new_index = []
 
         # TODO use map?
-        for i in range(0, len(df.index)):
+        for i in range(len(df.index)):
             x = df.index[i]
             new_index.append(datetime.date(year, x[0], int(x[1])))
 
@@ -1803,11 +1784,7 @@ class Calculations(object):
         index = combined.index
         combined = combined[valid]
 
-        if weights is not None:
-            filt_weights = combined.pop('__weights__')
-        else:
-            filt_weights = None
-
+        filt_weights = combined.pop('__weights__') if weights is not None else None
         filt_lhs = combined.pop('__y__')
         filt_rhs = combined
 
@@ -1823,7 +1800,7 @@ class Calculations(object):
         """
         for k, v in compat.iteritems(other):
             if k in d:
-                raise Exception('Duplicate regressor: %s' % k)
+                raise Exception(f'Duplicate regressor: {k}')
 
             d[k] = v
 
@@ -1845,9 +1822,9 @@ class Calculations(object):
                 elif isinstance(value, (dict, pd.DataFrame)):
                     self._safe_update(series, value)
                 else:  # pragma: no cover
-                    raise Exception('Invalid RHS data type: %s' % type(value))
+                    raise Exception(f'Invalid RHS data type: {type(value)}')
         else:  # pragma: no cover
-            raise Exception('Invalid RHS type: %s' % type(rhs))
+            raise Exception(f'Invalid RHS type: {type(rhs)}')
 
         if not isinstance(series, pd.DataFrame):
             series = pd.DataFrame(series, dtype=float)
@@ -1984,9 +1961,7 @@ class Calculations(object):
         new_fields = []
 
         for a in asset:
-            for x in ['open', 'high', 'low', 'close']:
-                new_fields.append(a + "." + x)
-
+            new_fields.extend(a + "." + x for x in ['open', 'high', 'low', 'close'])
         df.columns = new_fields
 
         return df
@@ -2000,14 +1975,7 @@ class Calculations(object):
         failed_conversion_cols = []
 
         for c in data_frame.columns:
-            is_date = False
-
-            # If it's a date column don't append to convert to a float
-            for d in date_columns:
-                if d in c or 'release-dt' in c:
-                    is_date = True
-                    break
-
+            is_date = any(d in c or 'release-dt' in c for d in date_columns)
             if is_date:
                 try:
                     data_frame[c] = pd.to_datetime(data_frame[c],
@@ -2036,8 +2004,7 @@ class Calculations(object):
                     pass
 
         if failed_conversion_cols != []:
-            logger.warning('Could not convert to float for ' + str(
-                failed_conversion_cols))
+            logger.warning(f'Could not convert to float for {failed_conversion_cols}')
 
         return data_frame
 

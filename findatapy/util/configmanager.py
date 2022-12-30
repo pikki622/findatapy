@@ -68,13 +68,11 @@ class ConfigManager(object):
     def __init__(self, *args, **kwargs):
         pass
 
-    def get_instance(cls, data_constants=None):
+    def get_instance(self, data_constants=None):
         if not ConfigManager.__instance:
             with ConfigManager.__lock:
                 if not ConfigManager.__instance:
-                    ConfigManager.__instance = super(ConfigManager,
-                                                     cls).__new__(
-                        ConfigManager)
+                    ConfigManager.__instance = super(ConfigManager, self).__new__(ConfigManager)
 
                     if data_constants is None:
                         data_constants = DataConstants()
@@ -113,11 +111,11 @@ class ConfigManager(object):
 
         if isinstance(data_constants.time_series_tickers_list, str):
             time_series_tickers_list_file = \
-                data_constants.time_series_tickers_list.split(
+                    data_constants.time_series_tickers_list.split(
                 ";")
         else:
             time_series_tickers_list_file = \
-                data_constants.time_series_tickers_list
+                    data_constants.time_series_tickers_list
 
         df_tickers = []
 
@@ -139,24 +137,24 @@ class ConfigManager(object):
                         freq_list = [freq_list]
 
                     for freq in freq_list:
-                        tickers = line["tickers"]
-                        cut = line["cut"]
                         vendor_tickers = str(line["vendor_tickers"])
                         expiry = None
 
+                        cut = line["cut"]
                         # Skip row where the vendor ticker hasn't been
                         # specified
                         if vendor_tickers.strip().lower() != "nan" \
-                            or vendor_tickers.strip() != "" \
-                            or vendor_tickers.strip().lower() != "none":
+                                or vendor_tickers.strip() != "" \
+                                or vendor_tickers.strip().lower() != "none":
 
                             if "expiry" in line.keys():
                                 expiry = line["expiry"]
 
                             if category != "":
+                                tickers = line["tickers"]
                                 # Conversion from library tickers to vendor vendor_tickers
                                 ConfigManager.\
-                                    _dict_time_series_tickers_list_library_to_vendor[
+                                        _dict_time_series_tickers_list_library_to_vendor[
                                         category + "." +
                                         data_source + "." +
                                         freq + "." +
@@ -164,16 +162,13 @@ class ConfigManager(object):
                                         tickers] = vendor_tickers
 
                                 try:
-                                    if expiry != "":
-                                        expiry = parse(expiry)
-                                    else:
-                                        expiry = None
+                                    expiry = parse(expiry) if expiry != "" else None
                                 except:
                                     pass
 
                                 # Library of tickers by category
                                 key = category + "." + data_source + "." + freq \
-                                      + "." + cut
+                                          + "." + cut
 
                                 # Conversion from library tickers to library expiry date
                                 ConfigManager._dict_time_series_ticker_expiry_date_library_to_library[
@@ -186,9 +181,8 @@ class ConfigManager(object):
                                         key + "." + vendor_tickers] = tickers
                                 except:
                                     logger.warning(
-                                        "Ticker not specified correctly (is some "
-                                        "of this missing?) " + str(
-                                            key) + "." + str(vendor_tickers))
+                                        f"Ticker not specified correctly (is some of this missing?) {str(key)}.{vendor_tickers}"
+                                    )
 
                                 if key in ConfigManager._dict_time_series_category_tickers_library_to_library:
                                     ConfigManager._dict_time_series_category_tickers_library_to_library[
@@ -245,18 +239,18 @@ class ConfigManager(object):
             cut = line["cut"]
             fields = line["fields"].split(",")
 
-            startdate = line["startdate"]
-            revision_periods = line["revision_periods"]
-
             if category != "":
                 # Conversion from library category to library fields list
                 ConfigManager._dict_time_series_category_fields_library_to_library[
                     category + "." + data_source + "." + freq + "." + cut] = fields
 
+                startdate = line["startdate"]
                 # Conversion from library category to library startdate
                 ConfigManager._dict_time_series_category_startdate_library_to_library[
                     category + "." + data_source + "." + freq + "." + cut] = parse(
                     startdate).date()
+
+                revision_periods = line["revision_periods"]
 
                 # Conversion from library category to library revision periods
                 ConfigManager._dict_time_series_category_revision_periods_library_to_library[
@@ -349,8 +343,7 @@ class ConfigManager(object):
         """
         logger = LoggerManager().getLogger(__name__)
 
-        logger.info(
-            "Finding ticker combination which matches " + str(free_form_query))
+        logger.info(f"Finding ticker combination which matches {str(free_form_query)}")
 
         df = ConfigManager._data_frame_time_series_tickers
 
@@ -410,31 +403,30 @@ class ConfigManager(object):
     @staticmethod
     def split_ticker_string(md_request_str):
 
-        if isinstance(md_request_str, str):
-            split_lst = []
+        if not isinstance(md_request_str, str):
+            return md_request_str
+        split_lst = []
 
-            word = ""
-            ignore_dot = False
+        word = ""
+        ignore_dot = False
 
-            for c in md_request_str:
-                if c == "{":
-                    ignore_dot = True
+        for c in md_request_str:
+            if c == "{":
+                ignore_dot = True
 
-                elif c == "}":
-                    ignore_dot = False
+            elif c == "}":
+                ignore_dot = False
 
-                elif c == "." and not (ignore_dot):
-                    split_lst.append(word)
-                    word = ""
-                    ignore_dot = False
-                else:
-                    word = word + c
+            elif c == "." and not (ignore_dot):
+                split_lst.append(word)
+                word = ""
+                ignore_dot = False
+            else:
+                word = word + c
 
-            split_lst.append(word)
+        split_lst.append(word)
 
-            return split_lst
-
-        return md_request_str
+        return split_lst
 
     @staticmethod
     def smart_group_dataframe_tickers(df,
@@ -448,17 +440,18 @@ class ConfigManager(object):
         if data_constants is None:
             data_constants = DataConstants()
 
-        if ret_fields is None:
+        if (
+            ret_fields is not None
+            and isinstance(ret_fields, str)
+            and ret_fields == "all"
+            or ret_fields is not None
+            and not isinstance(ret_fields, str)
+            and isinstance(ret_fields, list)
+            and ret_fields == []
+            or ret_fields is None
+        ):
             ret_fields = df.columns.to_list()
-        elif isinstance(ret_fields, str):
-            if ret_fields == "all":
-                ret_fields = df.columns.to_list()
-        elif isinstance(ret_fields, list):
-            if ret_fields == []:
-                ret_fields = df.columns.to_list()
-
-        if set(["category", "data_source", "freq", "cut"]).issubset(
-                ret_fields):
+        if {"category", "data_source", "freq", "cut"}.issubset(ret_fields):
             group_fields = ret_fields.copy()
 
             agg_dict = {}
@@ -486,9 +479,7 @@ class ConfigManager(object):
                 df_temp = df.groupby(group_fields).agg(agg_dict)
 
                 # If grouping fails (when there aren"t multiple elements to group!)
-                if df_temp.empty:
-                    pass
-                else:
+                if not df_temp.empty:
                     for i, g in enumerate(group_fields):
                         df_temp[g] = df_temp.index.get_level_values(i)
 
@@ -532,7 +523,7 @@ class ConfigManager(object):
     @staticmethod
     def get_potential_caches_from_tickers():
         all_categories = ConfigManager.\
-            _dict_time_series_category_tickers_library_to_library.keys()
+                _dict_time_series_category_tickers_library_to_library.keys()
 
         expanded_category_list = []
 
@@ -547,10 +538,18 @@ class ConfigManager(object):
                 intraday_tickers = ConfigManager.get_tickers_list_for_category(
                     category, data_source, freq, cut)
 
-                for intraday in intraday_tickers:
-                    expanded_category_list.append(
-                        category + "." + data_source + "." + freq +
-                        "." + cut + "." + intraday)
+                expanded_category_list.extend(
+                    category
+                    + "."
+                    + data_source
+                    + "."
+                    + freq
+                    + "."
+                    + cut
+                    + "."
+                    + intraday
+                    for intraday in intraday_tickers
+                )
             else:
                 expanded_category_list.append(
                     category + "." + data_source + "." + freq +
@@ -592,16 +591,10 @@ class ConfigManager(object):
     def get_filtered_tickers_list_for_category(category, data_source, freq,
                                                cut, filter):
         tickers = \
-        ConfigManager._dict_time_series_category_tickers_library_to_library[
+            ConfigManager._dict_time_series_category_tickers_library_to_library[
             category + "." + data_source + "." + freq + "." + cut]
 
-        filtered_tickers = []
-
-        for tick in tickers:
-            if re.search(filter, tick):
-                filtered_tickers.append(tick)
-
-        return filtered_tickers
+        return [tick for tick in tickers if re.search(filter, tick)]
 
     @staticmethod
     def get_tickers_list_for_category(category, data_source, freq, cut):
@@ -626,16 +619,15 @@ class ConfigManager(object):
     def get_vendor_tickers_list_for_category_str(
             category_data_source_freq_cut):
         tickers = \
-        ConfigManager._dict_time_series_category_tickers_library_to_library[
+            ConfigManager._dict_time_series_category_tickers_library_to_library[
             category_data_source_freq_cut]
 
-        vendor_tickers = []
-
-        for t in tickers:
-            vendor_tickers.append(
-                ConfigManager.convert_library_to_vendor_ticker_str(
-                    category_data_source_freq_cut + "." + t))
-
+        vendor_tickers = [
+            ConfigManager.convert_library_to_vendor_ticker_str(
+                category_data_source_freq_cut + "." + t
+            )
+            for t in tickers
+        ]
         return ConfigManager.flatten_list_of_lists(vendor_tickers)
 
     @staticmethod

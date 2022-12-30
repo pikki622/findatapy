@@ -101,16 +101,13 @@ class IOEngine(object):
             to create a new Excel file
         """
 
-        if (create_new):
+        if not create_new and self.path_exists(fname):
+            book = load_workbook(fname)
             writer = pd.ExcelWriter(fname, engine='xlsxwriter')
+            writer.book = book
+            writer.sheets = {ws.title: ws for ws in book.worksheets}
         else:
-            if self.path_exists(fname):
-                book = load_workbook(fname)
-                writer = pd.ExcelWriter(fname, engine='xlsxwriter')
-                writer.book = book
-                writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-            else:
-                writer = pd.ExcelWriter(fname, engine='xlsxwriter')
+            writer = pd.ExcelWriter(fname, engine='xlsxwriter')
 
         data_frame.to_excel(writer, sheet_name=sheet, engine='xlsxwriter')
 
@@ -184,20 +181,14 @@ class IOEngine(object):
 
                 if fname == 'flush_all_keys':
                     r.flushall()
-                else:
-                    # Allow deletion of keys by pattern matching
-                    matching_keys = r.keys('*' + fname)
+                elif matching_keys := r.keys('*' + fname):
+                    # Use pipeline to speed up command
+                    pipe = r.pipeline()
 
-                    if matching_keys:
-                        # Use pipeline to speed up command
-                        pipe = r.pipeline()
+                    for key in matching_keys:
+                        pipe.delete(key)
 
-                        for key in matching_keys:
-                            pipe.delete(key)
-
-                        pipe.execute()
-
-                    # r.delete(fname)
+                    pipe.execute()
 
             except Exception as e:
                 logger.warning(
@@ -220,8 +211,9 @@ class IOEngine(object):
                     connect=False)  # , username=username, password=password)
             else:
                 c = pymongo.MongoClient(
-                    host="mongodb://" + str(db_server) + ":" + str(db_port),
-                    connect=False)
+                    host=f"mongodb://{str(db_server)}:{str(db_port)}",
+                    connect=False,
+                )
 
             store = Arctic(c, socketTimeoutMS=socketTimeoutMS,
                            serverSelectionTimeoutMS=socketTimeoutMS,
@@ -306,40 +298,36 @@ class IOEngine(object):
                                       socket_timeout=timeout,
                                       socket_connect_timeout=timeout)
 
-                ping = r.ping()
-
-                # If Redis is alive, try pushing to it
-                if ping:
-                    if data_frame is not None:
-                        if isinstance(data_frame, pd.DataFrame):
-                            mem = data_frame.memory_usage(deep='deep').sum()
-                            mem_float = round(float(mem) / (1024.0 * 1024.0),
-                                              3)
-
-                            if mem_float < 500:
-
-
-                                if use_cache_compression:
-                                    ser = io.BytesIO()
-                                    data_frame.to_pickle(ser,
-                                                         compression="gzip")
-                                    ser.seek(0)
-
-                                    r.set('comp_' + fname, ser.read())
-                                else:
-                                    ser = io.BytesIO()
-                                    data_frame.to_pickle(ser)
-                                    ser.seek(0)
-
-                                    r.set(fname, ser.read())
-
-                                logger.info("Pushed " + fname + " to Redis")
-                            else:
-                                logger.warn(
-                                    "Did not push " + fname + " to Redis, given size")
-                    else:
+                if ping := r.ping():
+                    if data_frame is None:
                         logger.info(
                             "Object " + fname + " is empty, not pushed to Redis.")
+                    elif isinstance(data_frame, pd.DataFrame):
+                        mem = data_frame.memory_usage(deep='deep').sum()
+                        mem_float = round(float(mem) / (1024.0 * 1024.0),
+                                          3)
+
+                        if mem_float < 500:
+
+
+                            if use_cache_compression:
+                                ser = io.BytesIO()
+                                data_frame.to_pickle(ser,
+                                                     compression="gzip")
+                                ser.seek(0)
+
+                                r.set('comp_' + fname, ser.read())
+                            else:
+                                ser = io.BytesIO()
+                                data_frame.to_pickle(ser)
+                                ser.seek(0)
+
+                                r.set(fname, ser.read())
+
+                            logger.info("Pushed " + fname + " to Redis")
+                        else:
+                            logger.warn(
+                                "Did not push " + fname + " to Redis, given size")
                 else:
                     logger.warning(
                         "Didn't push " + fname + " to Redis given not running")
@@ -362,8 +350,9 @@ class IOEngine(object):
                     connect=False)  # , username=username, password=password)
             else:
                 c = pymongo.MongoClient(
-                    host="mongodb://" + str(db_server) + ":" + str(db_port),
-                    connect=False)
+                    host=f"mongodb://{str(db_server)}:{str(db_port)}",
+                    connect=False,
+                )
 
             store = Arctic(c, socketTimeoutMS=socketTimeoutMS,
                            serverSelectionTimeoutMS=socketTimeoutMS,
@@ -391,12 +380,7 @@ class IOEngine(object):
             if filter_out_matching is not None:
                 cols = data_frame.columns
 
-                new_cols = []
-
-                for col in cols:
-                    if filter_out_matching not in col:
-                        new_cols.append(col)
-
+                new_cols = [col for col in cols if filter_out_matching not in col]
                 data_frame = data_frame[new_cols]
 
             # Problems with Arctic when writing timezone to disk sometimes, so strip
@@ -436,7 +420,7 @@ class IOEngine(object):
 
                 while (i > 0):
                     read_index = \
-                    store.select('data', start=i, stop=nrows).index[0]
+                        store.select('data', start=i, stop=nrows).index[0]
 
                     if (read_index <= last_point): break
 
@@ -477,9 +461,8 @@ class IOEngine(object):
             logger.info("Written HDF5: " + fname)
 
         elif engine == 'parquet':
-            if '.parquet' not in fname:
-                if fname[-5:] != '.gzip':
-                    fname = fname + '.parquet'
+            if '.parquet' not in fname and fname[-5:] != '.gzip':
+                fname = fname + '.parquet'
 
             self.to_parquet(data_frame, fname,
                             cloud_credentials=cloud_credentials,
@@ -508,10 +491,7 @@ class IOEngine(object):
         -------
         str
         """
-        if fname[-3:] == '.h5':
-            return fname
-
-        return fname + ".h5"
+        return fname if fname[-3:] == '.h5' else fname + ".h5"
 
     def get_bcolz_filename(self, fname):
         """Strips bcolz off filename returning first portion of filename
@@ -525,10 +505,7 @@ class IOEngine(object):
         -------
         str
         """
-        if fname[-6:] == '.bcolz':
-            return fname
-
-        return fname + ".bcolz"
+        return fname if fname[-6:] == '.bcolz' else fname + ".bcolz"
 
     def write_r_compatible_hdf_dataframe(self, data_frame, fname, fields=None):
         """Write a DataFrame to disk in as an R compatible HDF5 file.
@@ -606,11 +583,7 @@ class IOEngine(object):
         data_frame_list = []
 
         if not (isinstance(fname, list)):
-            if '*' in fname:
-                fname = glob.glob(fname)
-            else:
-                fname = [fname]
-
+            fname = glob.glob(fname) if '*' in fname else [fname]
         for fname_single in fname:
             logger.debug("Reading " + fname_single + "..")
 
@@ -669,8 +642,9 @@ class IOEngine(object):
                         connect=False)  # , username=username, password=password)
                 else:
                     c = pymongo.MongoClient(
-                        host="mongodb://" + str(db_server) + ":" + str(
-                            db_port), connect=False)
+                        host=f"mongodb://{str(db_server)}:{str(db_port)}",
+                        connect=False,
+                    )
 
                 store = Arctic(c, socketTimeoutMS=socketTimeoutMS,
                                serverSelectionTimeoutMS=socketTimeoutMS)
@@ -720,13 +694,10 @@ class IOEngine(object):
 
             data_frame_list.append(data_frame)
 
-        if len(data_frame_list) == 0:
+        if not data_frame_list:
             return None
 
-        if len(data_frame_list) == 1:
-            return data_frame_list[0]
-
-        return data_frame_list
+        return data_frame_list[0] if len(data_frame_list) == 1 else data_frame_list
 
     ### functions for CSV reading and writing
     def write_time_series_to_csv(self, csv_path, data_frame):
@@ -763,58 +734,55 @@ class IOEngine(object):
 
             if dateparse is None:
                 dateparse = lambda x: datetime.datetime(
-                    *map(int, [x[6:10], x[3:5], x[0:2],
-                               x[11:13], x[14:16], x[17:19]]))
+                    *map(
+                        int, [x[6:10], x[3:5], x[:2], x[11:13], x[14:16], x[17:19]]
+                    )
+                )
             elif dateparse == 'dukascopy':
                 dateparse = lambda x: datetime.datetime(
-                    *map(int, [x[0:4], x[5:7], x[8:10],
-                               x[11:13], x[14:16], x[17:19]]))
+                    *map(
+                        int, [x[:4], x[5:7], x[8:10], x[11:13], x[14:16], x[17:19]]
+                    )
+                )
             elif dateparse == 'c':
                 # use C library for parsing dates, several hundred times quicker
                 # requires compilation of library to install
                 import ciso8601
                 dateparse = lambda x: ciso8601.parse_datetime(x)
 
-            if excel_sheet is None:
-                data_frame = pd.read_csv(f_name, index_col=0, parse_dates=True,
-                                         date_parser=dateparse)
-            else:
-                data_frame = pd.read_excel(f_name, excel_sheet, index_col=0,
-                                           na_values=['NA'])
-
+            data_frame = (
+                pd.read_csv(
+                    f_name, index_col=0, parse_dates=True, date_parser=dateparse
+                )
+                if excel_sheet is None
+                else pd.read_excel(
+                    f_name, excel_sheet, index_col=0, na_values=['NA']
+                )
+            )
             data_frame = data_frame.astype('float32')
             data_frame.index.names = ['Date']
-
             old_cols = data_frame.columns
-            new_cols = []
-
-            # add '.close' to each column name
-            for col in old_cols:
-                new_cols.append(col + postfix)
-
+            new_cols = [col + postfix for col in old_cols]
             data_frame.columns = new_cols
+        elif 'events' in f_name:
+
+            data_frame = pd.read_csv(f_name)
+
+            # very slow conversion
+            data_frame = data_frame.convert_objects(convert_dates='coerce')
+
+        elif excel_sheet is None:
+            try:
+                data_frame = pd.read_csv(f_name, index_col=0,
+                                         parse_dates=["DATE"],
+                                         date_parser=dateparse)
+            except:
+                data_frame = pd.read_csv(f_name, index_col=0,
+                                         parse_dates=["Date"],
+                                         date_parser=dateparse)
         else:
-            # daily data
-            if 'events' in f_name:
-
-                data_frame = pd.read_csv(f_name)
-
-                # very slow conversion
-                data_frame = data_frame.convert_objects(convert_dates='coerce')
-
-            else:
-                if excel_sheet is None:
-                    try:
-                        data_frame = pd.read_csv(f_name, index_col=0,
-                                                 parse_dates=["DATE"],
-                                                 date_parser=dateparse)
-                    except:
-                        data_frame = pd.read_csv(f_name, index_col=0,
-                                                 parse_dates=["Date"],
-                                                 date_parser=dateparse)
-                else:
-                    data_frame = pd.read_excel(f_name, excel_sheet,
-                                               index_col=0, na_values=['NA'])
+            data_frame = pd.read_excel(f_name, excel_sheet,
+                                       index_col=0, na_values=['NA'])
 
         # convert Date to Python datetime
         # datetime data_frame['Date1'] = data_frame.index
@@ -843,7 +811,7 @@ class IOEngine(object):
 
     def find_replace_chars(self, array, to_find, replace_with):
 
-        for i in range(0, len(to_find)):
+        for i in range(len(to_find)):
             array = [x.replace(to_find[i], replace_with[i]) for x in array]
 
         return array
@@ -961,7 +929,7 @@ class IOEngine(object):
         # os.environ["AWS_SECRET_ACCESS_KEY"] = cloud_credentials['aws_secret_key']
         # os.environ["AWS_SESSION_TOKEN"] = cloud_credentials['aws_session_token']
 
-        if "s3_pyarrow" == filesystem_type:
+        if filesystem_type == "s3_pyarrow":
             return pyarrow.fs.S3FileSystem(anon=cloud_credentials["aws_anon"],
                                            access_key=cloud_credentials[
                                                "aws_access_key"],
@@ -970,7 +938,7 @@ class IOEngine(object):
                                            session_token=cloud_credentials[
                                                "aws_session_token"])
 
-        elif "s3_filesystem" == filesystem_type:
+        elif filesystem_type == "s3_filesystem":
             return S3FileSystem(anon=cloud_credentials["aws_anon"],
                                 key=cloud_credentials["aws_access_key"],
                                 secret=cloud_credentials["aws_secret_key"],
@@ -990,24 +958,14 @@ class IOEngine(object):
                     'aws_session_token': 'token'
                     }
 
-        for m in mappings.keys():
+        for m in mappings:
             if m not in cloud_credentials.keys():
-                if m in boolean_keys:
-                    cloud_credentials[m] = boolean_keys[m]
-                else:
-                    cloud_credentials[m] = None
-
+                cloud_credentials[m] = boolean_keys.get(m)
         # Converts the field names eg. aws_access_key => key etc.
         # Mainly for using pd.read_parquet
         if convert_to_s3fs:
 
-            cloud_credentials_temp = {}
-
-            for m in cloud_credentials.keys():
-                cloud_credentials_temp[mappings[m]] = cloud_credentials[m]
-
-            return cloud_credentials_temp
-
+            return {mappings[m]: cloud_credentials[m] for m in cloud_credentials.keys()}
         return cloud_credentials
 
     def to_parquet(self, df, path, filename=None, cloud_credentials=None,
@@ -1094,9 +1052,7 @@ class IOEngine(object):
                     p_in_s3 = p.replace("s3://", "")
 
                     for df_ in df_list:
-                        logger.info(
-                            "S3 chunk... " + str(counter) + " of " + str(
-                                len(df_list)))
+                        logger.info(f"S3 chunk... {str(counter)} of {len(df_list)}")
                         table = pa.Table.from_pandas(df_)
 
                         if pqwriter is None:
@@ -1112,9 +1068,7 @@ class IOEngine(object):
 
                 else:
                     for df_ in df_list:
-                        logger.info(
-                            "Local chunk... " + str(counter) + " of " + str(
-                                len(df_list)))
+                        logger.info(f"Local chunk... {str(counter)} of {len(df_list)}")
                         table = pa.Table.from_pandas(df_)
 
                         if pqwriter is None:
@@ -1132,6 +1086,7 @@ class IOEngine(object):
                     pqwriter.close()
 
                     # df.to_parquet(path, compression=parquet_compression)
+
 
         if use_pyarrow_directly:
             pyarrow_dump(df, path)
@@ -1157,8 +1112,8 @@ class IOEngine(object):
 
             except pyarrow.lib.ArrowMemoryError as e:
                 logger.warning(
-                    "Couldn't dump using Pandas/pyarrow, will instead try chunking with pyarrow directly " + str(
-                        e))
+                    f"Couldn't dump using Pandas/pyarrow, will instead try chunking with pyarrow directly {str(e)}"
+                )
 
                 pyarrow_dump(df, path)
 
@@ -1181,10 +1136,10 @@ class IOEngine(object):
         list of arrays or DataFrames
         """
 
-        if chunk_size is None and chunks is None:
-            return array
-
         if chunk_size is None:
+            if chunks is None:
+                return array
+
             chunk_size = int(array.shape[0] / chunks)
 
         if chunks is None:
@@ -1201,36 +1156,23 @@ class IOEngine(object):
         #
         #     return array_list
 
-        if chunks > 0:
-            # if isinstance(array, pd.DataFrame):
-            #    array = [array[i:i + chunk_size] for i in range(0, array.shape[0], chunk_size)]
-
-            return np.array_split(array, chunks)
-
-        return array
+        return np.array_split(array, chunks) if chunks > 0 else array
 
     def get_obj_size_mb(self, obj):
         # Can sometime have very large dataframes, which need to be split, otherwise won't fit in a single Redis key
         mem = obj.memory_usage(deep='deep').sum()
-        mem_float = round(float(mem) / (1024.0 * 1024.0), 3)
-
-        return mem_float
+        return round(float(mem) / (1024.0 * 1024.0), 3)
 
     def chunk_dataframes(self, obj, chunk_size_mb=constants.chunk_size_mb):
         logger = LoggerManager.getLogger(__name__)
 
         # Can sometime have very large dataframes, which need to be split, otherwise won't fit in a single Redis key
         mem_float = self.get_obj_size_mb(obj)
-        mem = '----------- ' + str(mem_float) + ' MB -----------'
+        mem = f'----------- {str(mem_float)} MB -----------'
 
         chunks = int(math.ceil(mem_float / chunk_size_mb))
 
-        if chunks > 1:
-            obj_list = self.split_array_chunks(obj, chunks=chunks)
-        else:
-
-            obj_list = [obj]
-
+        obj_list = self.split_array_chunks(obj, chunks=chunks) if chunks > 1 else [obj]
         if obj_list != []:
             logger.info("Pandas dataframe of size: " + mem + " in " + str(
                 chunks) + " chunk(s)")
@@ -1249,17 +1191,18 @@ class IOEngine(object):
 
             # Use 'w' for py3, 'wb' for py2
             with s3.open(path_in_s3, 'r', errors=errors) as f:
-                if encoding_errors is not None:
-                    return pd.read_csv(f, encoding=encoding,
-                                       encoding_errors=encoding_errors)
-                else:
-                    return pd.read_csv(f, encoding=encoding)
+                return (
+                    pd.read_csv(
+                        f, encoding=encoding, encoding_errors=encoding_errors
+                    )
+                    if encoding_errors is not None
+                    else pd.read_csv(f, encoding=encoding)
+                )
+        elif encoding_errors is not None:
+            return pd.read_csv(path, encoding=encoding,
+                               encoding_errors=encoding_errors)
         else:
-            if encoding_errors is not None:
-                return pd.read_csv(path, encoding=encoding,
-                                   encoding_errors=encoding_errors)
-            else:
-                return pd.read_csv(path, encoding=encoding)
+            return pd.read_csv(path, encoding=encoding)
 
     def to_csv_parquet(self, df, path, filename=None, cloud_credentials=None,
                        parquet_compression=constants.parquet_compression,
@@ -1277,17 +1220,11 @@ class IOEngine(object):
     def _get_cloud_path(self, path, filename=None, cloud_credentials=None):
         if cloud_credentials is None: cloud_credentials = constants.cloud_credentials
 
-        if isinstance(path, list):
-            pass
-        else:
+        if not isinstance(path, list):
             path = [path]
 
         if filename is not None:
-            new_path = []
-
-            for p in path:
-                new_path.append(self.path_join(p, filename))
-
+            new_path = [self.path_join(p, filename) for p in path]
             path = new_path
 
         return path, cloud_credentials
@@ -1328,24 +1265,22 @@ class IOEngine(object):
                         json.dump(dictionary, f, indent=4)
                     else:
                         dictionary.to_json(f)
-            else:
-                if isinstance(dictionary, dict):
-                    json.dump(dictionary, p, indent=4)
-                elif isinstance(dictionary, pd.DataFrame):
-                    dictionary.to_json(p)
+            elif isinstance(dictionary, dict):
+                json.dump(dictionary, p, indent=4)
+            elif isinstance(dictionary, pd.DataFrame):
+                dictionary.to_json(p)
 
     def path_exists(self, path, cloud_credentials=None):
         if cloud_credentials is None: cloud_credentials = constants.cloud_credentials
 
-        if "s3://" in path:
-            s3 = self._create_cloud_filesystem(cloud_credentials,
-                                               's3_filesystem')
-
-            path_in_s3 = path.replace("s3://", "")
-
-            return s3.exists(path_in_s3)
-        else:
+        if "s3://" not in path:
             return os.path.exists(path)
+        s3 = self._create_cloud_filesystem(cloud_credentials,
+                                           's3_filesystem')
+
+        path_in_s3 = path.replace("s3://", "")
+
+        return s3.exists(path_in_s3)
 
     def path_join(self, folder, *file):
 
@@ -1412,9 +1347,8 @@ class IOEngine(object):
 
                 if self.path_exists(path, cloud_credentials=cloud_credentials):
                     s3.delete(path_in_s3)
-            else:
-                if self.path_exists(p, cloud_credentials=cloud_credentials):
-                    os.remove(p)
+            elif self.path_exists(p, cloud_credentials=cloud_credentials):
+                os.remove(p)
 
     def copy(self, source, destination, cloud_credentials=None,
              infer_dest_filename=False):
@@ -1445,9 +1379,7 @@ class IOEngine(object):
                 if infer_dest_filename:
                     dest = self.path_join(destination, os.path.basename(so))
 
-                if "s3://" not in dest and "s3://" not in so:
-                    shutil.copy(so, dest)
-                else:
+                if "s3://" in dest or "s3://" in so:
                     s3 = self._create_cloud_filesystem(cloud_credentials,
                                                        's3_filesystem')
 
@@ -1456,14 +1388,17 @@ class IOEngine(object):
                               self.sanitize_path(dest).replace("s3://", ""),
                               recursive=True)
 
-                    elif "s3://" in dest and "s3://" not in so:
+                    elif "s3://" in dest:
                         s3.put(so,
                                self.sanitize_path(dest).replace("s3://", ""),
                                recursive=True)
 
-                    elif "s3://" not in dest and "s3://" in so:
+                    elif "s3://" in so:
                         s3.get(self.sanitize_path(so).replace("s3://", ""),
                                dest, recursive=True)
+
+                else:
+                    shutil.copy(so, dest)
 
 
 #######################################################################################################################
@@ -1544,22 +1479,19 @@ class SpeedCache(object):
 
         for k in obj.__dict__:
 
-            if 'api_key' not in k:
-                # provided the key is not in one of the dropped keys
-                if not (any(a == k for a in key_drop)):
-                    add = obj.__dict__[k]
+            if 'api_key' not in k and all(a != k for a in key_drop):
+                add = obj.__dict__[k]
 
-                    if add is not None:
-                        if isinstance(add, list): add = '_'.join(
-                            str(e) for e in add)
-
-                    key.append(str(k) + '-' + str(add))
+                if add is not None and isinstance(add, list):
+                    if isinstance(add, list): add = '_'.join(
+                        str(e) for e in add)
+                key.append(f'{str(k)}-{str(add)}')
 
         key.sort()
         key = '_'.join(str(e) for e in key).replace(type(obj).__name__,
                                                     '').replace('___', '_')
 
-        return type(obj).__name__ + "_" + str(len(str(key))) + "_" + str(key)
+        return type(obj).__name__ + "_" + str(len(key)) + "_" + key
 
 
 # TODO refactor code to use DBEngine

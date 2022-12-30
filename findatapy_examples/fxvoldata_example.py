@@ -37,7 +37,7 @@ if __name__ == '__main__':
     cache_algo = 'cache_algo_return'
 
     ###### Download FX volatility quotations from Bloomberg
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ####### Bloomberg examples (you need to have a Bloomberg Terminal
         # installed for this to work!)
         # let's download of 1M ATM data for EURUSD
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         print(df.tail(n=10))
 
 ###### Download FX volatility quotations from Bloomberg defining all fields
-if run_example == 2 or run_example == 0:
+if run_example in [2, 0]:
     ####### Bloomberg examples (you need to have a Bloomberg Terminal installed
     # for this to work!)
     # now we define the vendor_tickers and vendor_fields (we don't need to have

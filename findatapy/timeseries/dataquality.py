@@ -63,9 +63,7 @@ class DataQuality(object):
         valid = float(df.count().sum())
         total = nan + valid
 
-        if total == 0: return 0
-
-        return round(100.0 * (nan / total), 1)
+        return 0 if total == 0 else round(100.0 * (nan / total), 1)
 
     def percentage_nan_by_columns(self, df, start_date=None):
         """Calculates the percentage of NaN values in a DataFrame and reports
@@ -137,7 +135,7 @@ class DataQuality(object):
         start_date = df_dates[start_date_field][index]
         finish_date = df_dates[finish_date_field][index]
 
-        for i in range(0, len(df.columns)):
+        for i in range(len(df.columns)):
             df_sub = df[df.columns[i]]
 
             percentage_nan[df.columns[i]] = self.percentage_nan(
@@ -191,9 +189,6 @@ class DataQuality(object):
                 # quality is good we won't have this issue)
                 if strip_index is not None:
                     df.ix[:strip_index, c] = numpy.nan
-
-        elif freq == 'intraday':
-            pass
 
         return df
 

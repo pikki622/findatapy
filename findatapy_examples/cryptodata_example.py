@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     run_example = 0
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ### Download data from bitcoincharts ###
         # fields contains ["close","volume"]
         # return tick data
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         print(df.head(5))
         print(df.tail(5))
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         ### Download data from poloniex ###
         # freq : daily or intraday, where intraday - returns 5 minutes data.
         # fields contains ["close","high","low","open","quote-volume","volume","weighted-average"]
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         print(df.head(5))
         print(df.tail(5))
 
-    if run_example == 3 or run_example == 0:
+    if run_example in {3, 0}:
         ### download data from binance ###
         # freq: daily or intraday.  intraday - return 1 minute data
         # fields contain ["open","high","low","close","volume","quote-asset-volume",
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         print(df.head(5))
         print(df.tail(5))
 
-    if run_example == 4 or run_example == 0:
+    if run_example in {4, 0}:
         ### download data from bitfinex ###
         # freq: daily or intraday.  intraday - return 1 minute data
         # fields contain ["open","close","high","low","volume"]
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         print(df.head(5))
         print(df.tail(5))
 
-    if run_example == 5 or run_example == 0:
+    if run_example in {5, 0}:
         ### Download data from gdax (now called coinbase pro) ###
         # freq: daily or intraday.  intraday - 1 minute data
         # fields contain ["low","high","open","close","volume"]
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         print(df.head(5))
         print(df.tail(5))
 
-    if run_example == 6:
+    elif run_example == 6:
         ### Download data from kraken ###
         # freq: tick (all trade data)
         # fields contain ["close","volume","buy-sell","market-limit"]

@@ -85,9 +85,9 @@ class DataVendorBBG(DataVendor):
             bbg_ref_fields = list(constants.bbg_ref_fields.keys())
             bbg_ref_vendor_fields = list(constants.bbg_ref_fields.values())
 
-            for i in range(0, len(md_request.fields)):
+            for i in range(len(md_request.fields)):
                 if md_request.fields[i] in bbg_ref_fields \
-                        or md_request_vendor.fields[
+                            or md_request_vendor.fields[
                     i] in bbg_ref_vendor_fields:
                     ref_fields.append(md_request.fields[i])
                     ref_vendor_fields.append(
@@ -96,9 +96,9 @@ class DataVendorBBG(DataVendor):
             non_ref_fields = []
             non_ref_vendor_fields = []
 
-            for i in range(0, len(md_request.fields)):
+            for i in range(len(md_request.fields)):
                 if md_request.fields[i] not in bbg_ref_fields \
-                        and md_request_vendor.fields[
+                            and md_request_vendor.fields[
                     i] not in bbg_ref_vendor_fields:
                     non_ref_fields.append(md_request.fields[i])
                     non_ref_vendor_fields.append(
@@ -106,7 +106,7 @@ class DataVendorBBG(DataVendor):
 
             # For certain cases, need to use ReferenceDataRequest
             # eg. for events times/dates, last tradeable date fields (when specified)
-            if len(ref_fields) > 0:
+            if ref_fields:
 
                 # Careful: make sure you copy the market data request object
                 # (when threading, altering that can
@@ -129,7 +129,7 @@ class DataVendorBBG(DataVendor):
                 # Download all the other event or non-ref fields
                 # (uses HistoricalDataRequest to Bloomberg)
                 # concatenate with date time fields
-                if len(non_ref_fields) > 0:
+                if non_ref_fields:
 
                     md_request.fields = non_ref_fields
                     md_request.vendor_fields = non_ref_vendor_fields
@@ -155,8 +155,6 @@ class DataVendorBBG(DataVendor):
                 md_request_vendor.fields = copy.deepcopy(
                     old_vendor_fields)
 
-            # For all other daily/monthly/quarter data, we can use
-            # HistoricalDataRequest to Bloomberg
             else:
                 data_frame = self.get_daily_data(md_request,
                                                  md_request_vendor)
@@ -178,7 +176,7 @@ class DataVendorBBG(DataVendor):
         if (md_request.freq in ['tick', 'intraday', 'second',
                                          'minute', 'hourly']):
             md_request_vendor.tickers = \
-            md_request_vendor.tickers[0]
+                md_request_vendor.tickers[0]
 
             if md_request.freq in ['tick', 'second']:
                 data_frame = self.download_tick(md_request_vendor)
@@ -242,11 +240,7 @@ class DataVendorBBG(DataVendor):
             tickers = self.translate_from_vendor_ticker(returned_tickers,
                                                         md_request)
 
-            ticker_combined = []
-
-            for i in range(0, len(fields)):
-                ticker_combined.append(tickers[i] + "." + fields[i])
-
+            ticker_combined = [tickers[i] + "." + fields[i] for i in range(len(fields))]
             # Convert numerical columns to floats and dates to dates (avoids
             # having object columns which can cause issues with later Pandas)
             data_frame = self.force_type_conversion(data_frame)
@@ -301,24 +295,20 @@ class DataVendorBBG(DataVendor):
             tickers = self.translate_from_vendor_ticker(returned_tickers,
                                                         md_request)
 
-            ticker_combined = []
-
-            for i in range(0, len(fields)):
-                ticker_combined.append(tickers[i] + "." + fields[i])
-
+            ticker_combined = [tickers[i] + "." + fields[i] for i in range(len(fields))]
             data_frame.columns = ticker_combined
 
             # Need to convert numerical and datetime columns separately post
             # pandas 0.23
             data_frame = self.force_type_conversion(data_frame)
 
-            # data_frame = data_frame.apply(pd.to_datetime, errors='ignore')
-            # data_frame = data_frame.apply(pd.to_numeric, errors='ignore')
+                # data_frame = data_frame.apply(pd.to_datetime, errors='ignore')
+                # data_frame = data_frame.apply(pd.to_numeric, errors='ignore')
 
-            # TODO coerce will be deprecated from pandas 0.23.0 onwards) so
-            #  remove!
-            # data_frame = data_frame.convert_objects(convert_dates = 'coerce',
-            # convert_numeric= 'coerce')
+                # TODO coerce will be deprecated from pandas 0.23.0 onwards) so
+                #  remove!
+                # data_frame = data_frame.convert_objects(convert_dates = 'coerce',
+                # convert_numeric= 'coerce')
 
         return data_frame
 
@@ -327,54 +317,53 @@ class DataVendorBBG(DataVendor):
 
         logger = LoggerManager().getLogger(__name__)
 
-        if data_frame is not None:
-            if not (data_frame.empty):
+        if data_frame is not None and not (data_frame.empty):
                 # Need to convert numerical and datetime columns separately
                 # post pandas 0.23
-                for c in data_frame.columns:
-                    is_date = False
+            for c in data_frame.columns:
+                is_date = False
 
                     # Special case for ECO_RELEASE_DT / FIRST_REVISION_DATE
-                    if 'ECO_RELEASE_DT' in c or 'FIRST_REVISION_DATE' in c:
-                        try:
-                            temp_col = []  # data_frame[c].values
+                if 'ECO_RELEASE_DT' in c or 'FIRST_REVISION_DATE' in c:
+                    try:
+                        temp_col = []  # data_frame[c].values
 
-                            for i in range(0, len(data_frame[c].values)):
-                                try:
-                                    temp_col.append(pd.to_datetime(
-                                        str(int(data_frame[c].values[i])),
-                                        format='%Y%m%d'))
-                                except:
-                                    temp_col.append(np.datetime64('NaT'))
-
-                            data_frame[c] = temp_col
-                        except Exception as e:
-                            logger.warning("Couldn't convert " + str(
-                                c) + " to date.. was this column empty? " + str(
-                                e))
-
-                    else:
-                        # Only convert those Bloomberg reference fields to
-                        # dates which have been listed explicitly
-                        for d in constants.always_date_columns:
-                            if d in c:
-                                try:
-                                    data_frame[c] = pd.to_datetime(
-                                        data_frame[c], errors='coerce')
-
-                                    is_date = True
-                                    break
-                                except:
-                                    pass
-
-                        # Otherwise this is not a date field so attempt to
-                        # convert into numbers
-                        if not (is_date):
+                        for i in range(len(data_frame[c].values)):
                             try:
-                                data_frame[c] = pd.to_numeric(data_frame[c],
-                                                              errors='ignore')
+                                temp_col.append(pd.to_datetime(
+                                    str(int(data_frame[c].values[i])),
+                                    format='%Y%m%d'))
+                            except:
+                                temp_col.append(np.datetime64('NaT'))
+
+                        data_frame[c] = temp_col
+                    except Exception as e:
+                        logger.warning(
+                            f"Couldn't convert {str(c)} to date.. was this column empty? {str(e)}"
+                        )
+
+                else:
+                    # Only convert those Bloomberg reference fields to
+                    # dates which have been listed explicitly
+                    for d in constants.always_date_columns:
+                        if d in c:
+                            try:
+                                data_frame[c] = pd.to_datetime(
+                                    data_frame[c], errors='coerce')
+
+                                is_date = True
+                                break
                             except:
                                 pass
+
+                    # Otherwise this is not a date field so attempt to
+                    # convert into numbers
+                    if not (is_date):
+                        try:
+                            data_frame[c] = pd.to_numeric(data_frame[c],
+                                                          errors='ignore')
+                        except:
+                            pass
 
         logger.debug("Returning converted dataframe...")
 
@@ -434,37 +423,19 @@ class DataVendorBBGOpen(DataVendorBBG):
         # Bloomberg OpenAPI implementation
         low_level_loader = BBGLowLevelTick()
 
-        # by default we download all available fields!
-        data_frame = low_level_loader.load_time_series(md_request)
-
-        # self.kill_session() # need to forcibly kill_session since can't
-        # always reopen
-
-        return data_frame
+        return low_level_loader.load_time_series(md_request)
 
     def download_intraday(self, md_request):
         # Bloomberg OpenAPI implementation
         low_level_loader = BBGLowLevelIntraday()
 
-        # by default we download all available fields!
-        data_frame = low_level_loader.load_time_series(md_request)
-
-        # self.kill_session() # need to forcibly kill_session since can't
-        # always reopen
-
-        return data_frame
+        return low_level_loader.load_time_series(md_request)
 
     def download_daily(self, md_request):
         # Bloomberg Open API implementation
         low_level_loader = BBGLowLevelDaily()
 
-        # By default we download all available fields!
-        data_frame = low_level_loader.load_time_series(md_request)
-
-        # self.kill_session() # need to forcibly kill_session since can't
-        # always reopen
-
-        return data_frame
+        return low_level_loader.load_time_series(md_request)
 
     def download_ref(self, md_request):
         # Bloomberg Open API implementation
@@ -472,20 +443,7 @@ class DataVendorBBGOpen(DataVendorBBG):
 
         md_request_vendor_selective = copy.copy(md_request)
 
-        # special case for future date releases
-        # if 'release-date-time-full' in md_request.fields:
-        #     md_request_vendor_selective.fields = ['ECO_FUTURE_RELEASE_DATE_LIST']
-        #
-        # if 'last-tradeable-day' in md_request.fields:
-        #     md_request_vendor_selective.fields = ['LAST_TRADEABLE_DT']
-
-        data_frame = low_level_loader.load_time_series(
-            md_request_vendor_selective)
-
-        # self.kill_session() # need to forcibly kill_session since can't
-        # always reopen
-
-        return data_frame
+        return low_level_loader.load_time_series(md_request_vendor_selective)
 
     def kill_session(self):
         # TODO not really needed, because we automatically kill sessions
@@ -551,14 +509,15 @@ class BBGLowLevelTemplate:  # in order that the init function works in
                         # can't always reopen
                         session = self.start_bloomberg_session()
 
-                        if session is not None:
-                            if session.openService("//blp/refdata"): i = 6
+                        if session is not None and session.openService(
+                            "//blp/refdata"
+                        ):
+                            i = 6
                 else:
-                    logger.info(
-                        "Try opening Bloomberg session... try " + str(i))
+                    logger.info(f"Try opening Bloomberg session... try {i}")
                     session = self.start_bloomberg_session()
 
-                i = i + 1
+                i += 1
 
             # Give error if still doesn't work after several tries..
             if not session.openService("//blp/refdata"):
@@ -624,10 +583,11 @@ class BBGLowLevelTemplate:  # in order that the init function works in
                 not_done = False
             else:
                 for msg in event:
-                    if event.eventType() == blpapi.Event.SESSION_STATUS:
-
-                        if msg.messageType() == self.SESSION_TERMINATED:
-                            not_done = False
+                    if (
+                        event.eventType() == blpapi.Event.SESSION_STATUS
+                        and msg.messageType() == self.SESSION_TERMINATED
+                    ):
+                        not_done = False
 
             # Append DataFrame only if not empty
             if data_frame_slice is not None:
@@ -644,11 +604,11 @@ class BBGLowLevelTemplate:  # in order that the init function works in
                 except:
                     pass
 
-        if data_frame_cols == [] and data_frame_list != []:  # intraday case
-            data_frame = pd.concat(data_frame_list)
-        else:  # daily frequencies
+        if data_frame_cols or not data_frame_list:  # daily frequencies
             data_frame = Calculations().join(data_frame_list, how='outer')
 
+        else:  # intraday case
+            data_frame = pd.concat(data_frame_list)
         # make sure we do not have any duplicates in the time series
         if data_frame is not None:
             # if data_frame.empty == False:
@@ -668,8 +628,7 @@ class BBGLowLevelTemplate:  # in order that the init function works in
             # logger.info(msg)
 
             if msg.hasElement(self.RESPONSE_ERROR):
-                logger.error("REQUEST FAILED: " + str(
-                    msg.getElement(self.RESPONSE_ERROR)))
+                logger.error(f"REQUEST FAILED: {str(msg.getElement(self.RESPONSE_ERROR))}")
                 continue
 
             data_frame_slice = self.process_message(msg)
@@ -677,11 +636,10 @@ class BBGLowLevelTemplate:  # in order that the init function works in
             if (data_frame_slice is not None):
                 data_frame_list.append(data_frame_slice)
 
-        if data_frame_list == []:
-            logger.warn("No elements for ticker.")
-            return None
-        else:
+        if data_frame_list:
             return pd.concat(data_frame_list)
+        logger.warn("No elements for ticker.")
+        return None
 
     def get_previous_trading_date(self):
         tradedOn = datetime.date.today()
@@ -727,7 +685,7 @@ class BBGLowLevelTemplate:  # in order that the init function works in
 
                 tries = 5
             except:
-                tries = tries + 1
+                tries += 1
 
         # BBGLowLevelTemplate._session = session
 
@@ -802,8 +760,7 @@ class BBGLowLevelDaily(BBGLowLevelTemplate):
                 return data_frame_slice
         except Exception as e:
 
-            LoggerManager().getLogger(__name__).warn(
-                'Data slice empty ' + str(e))
+            LoggerManager().getLogger(__name__).warn(f'Data slice empty {str(e)}')
 
             return None
 
@@ -887,7 +844,7 @@ class BBGLowLevelDaily(BBGLowLevelTemplate):
             for tick, override in override_dict.items():
                 if override == last_override:
 
-                    if len(options_list) > 0:
+                    if options_list:
                         options_list[-1].security.append(tick)
                     else:
                         add_new_options(tick)
@@ -896,17 +853,14 @@ class BBGLowLevelDaily(BBGLowLevelTemplate):
 
                 last_override = override
 
-            # print('stop')
-            # options_list.append(curr_options)
+                # print('stop')
+                # options_list.append(curr_options)
         else:
             options.security = md_request.tickers
 
             return options
 
-        if len(options_list) == 1:
-            return options_list[0]
-
-        return options_list
+        return options_list[0] if len(options_list) == 1 else options_list
 
     def process_message(self, msg):
 
@@ -946,15 +900,13 @@ class BBGLowLevelDaily(BBGLowLevelTemplate):
 
         data_frame = pd.DataFrame(data)
 
-        # If obsolete ticker could return no values
         if data_frame.empty:
             return None
-        else:
-            # data_frame.columns = pd.MultiIndex.from_tuples(data,
-            # names=['field', 'ticker'])
-            data_frame.index = pd.to_datetime(data_frame.index)
-            logger.info("Read: " + ticker + ' ' + str(
-                data_frame.index.min()) + ' - ' + str(data_frame.index.max()))
+        # data_frame.columns = pd.MultiIndex.from_tuples(data,
+        # names=['field', 'ticker'])
+        data_frame.index = pd.to_datetime(data_frame.index)
+        logger.info("Read: " + ticker + ' ' + str(
+            data_frame.index.min()) + ' - ' + str(data_frame.index.max()))
 
         return data_frame
 
@@ -978,7 +930,7 @@ class BBGLowLevelDaily(BBGLowLevelTemplate):
         # Add user defined overrides for BBG request
         self.add_override_dict(request, options)
 
-        logger.info("Sending Bloomberg Daily Request:" + str(request))
+        logger.info(f"Sending Bloomberg Daily Request:{str(request)}")
         session.sendRequest(request=request, correlationId=cid)
 
 
@@ -1017,16 +969,16 @@ class BBGLowLevelRef(BBGLowLevelTemplate):
 
             for field in fieldData.elements():
                 if not field.isValid():
-                    field_name = "%s" % field.name()
+                    field_name = f"{field.name()}"
 
                     logger.error(field_name + " is NULL")
                 elif field.isArray():
                     # iterate over complex data returns.
-                    field_name = "%s" % field.name()
+                    field_name = f"{field.name()}"
 
                     for i, row in enumerate(field.values()):
                         try:
-                            field_val = re.findall(r'"(.*?)"', "%s" % row)[0]
+                            field_val = re.findall(r'"(.*?)"', f"{row}")[0]
                         except:
                             e = row.getElement(0)
                             # k = str(e.name())
@@ -1036,12 +988,12 @@ class BBGLowLevelRef(BBGLowLevelTemplate):
 
                         index = index + 1
                 else:
-                    field_name = "%s" % field.name()
+                    field_name = f"{field.name()}"
                     data[(field_name, ticker)][0] = field.getValueAsString()
 
                     index = index + 1
                     single = True  # no need to create multi-index late,
-                    # because just row!! CAREFUL!! needed for futures expiries
+                                # because just row!! CAREFUL!! needed for futures expiries
 
             fieldExceptionArray = securityData.getElement("fieldExceptions")
 
@@ -1049,7 +1001,7 @@ class BBGLowLevelRef(BBGLowLevelTemplate):
                 errorInfo = fieldException.getElement("errorInfo")
 
                 print(errorInfo.getElementAsString("category"), ":", \
-                      fieldException.getElementAsString("fieldId"))
+                          fieldException.getElementAsString("fieldId"))
                 print("stop")
 
         # Explicitly state from_dict (buggy if create pd.DataFrame(data)
@@ -1097,7 +1049,7 @@ class BBGLowLevelRef(BBGLowLevelTemplate):
         # Add user defined overrides for BBG request
         self.add_override_dict(request, options)
 
-        logger.info("Sending Bloomberg Ref Request:" + str(request))
+        logger.info(f"Sending Bloomberg Ref Request:{str(request)}")
         session.sendRequest(request=request, correlationId=cid)
 
 
@@ -1165,8 +1117,7 @@ class BBGLowLevelIntraday(BBGLowLevelTemplate):
         time_list = list(map(itemgetter(1), tuple))
 
         try:
-            logger.info("Dates between " + str(time_list[0]) + " - " + str(
-                time_list[-1]))
+            logger.info(f"Dates between {str(time_list[0])} - {str(time_list[-1])}")
         except:
             logger.info("No dates retrieved")
             return None
@@ -1276,8 +1227,7 @@ class BBGLowLevelTick(BBGLowLevelTemplate):
         time_list = list(map(itemgetter(1), tuple))
 
         try:
-            logger.info("Dates between " + str(time_list[0]) + " - " + str(
-                time_list[-1]))
+            logger.info(f"Dates between {str(time_list[0])} - {str(time_list[-1])}")
         except:
             logger.info("No dates retrieved")
             return None

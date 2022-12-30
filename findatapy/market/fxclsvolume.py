@@ -72,7 +72,7 @@ class FXCLSVolume(object):
         for t in currency_pairs:
 
             df = None
-            for i in range(0, 24):
+            for i in range(24):
                 txt = str(i)
 
                 df1 = pandas.DataFrame(data_frame[t + "." + txt + 'h'].copy())
@@ -80,11 +80,7 @@ class FXCLSVolume(object):
                 df1.columns = [t + '.volume']
                 df1.index = df1.index + pandas.DateOffset(hours=i)
 
-                if df is None:
-                    df = df1
-                else:
-                    df = df.append(df1)
-
+                df = df1 if df is None else df.append(df1)
             df = df.sort_index()
             df_list.append(df)
 

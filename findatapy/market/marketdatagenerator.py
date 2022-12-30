@@ -69,13 +69,13 @@ class MarketDataGenerator(object):
         """
         logger = LoggerManager().getLogger(__name__)
 
-        data_source = md_request.data_source
         data_engine = md_request.data_engine
 
+        data_source = md_request.data_source
         # Special case for files (csv, h5, parquet or zip)
         if ".csv" in str(data_source) or ".h5" in str(data_source) or \
-                ".parquet" in str(data_source) or ".zip" in str(data_source) \
-                or (data_engine is not None
+                    ".parquet" in str(data_source) or ".zip" in str(data_source) \
+                    or (data_engine is not None
                     and md_request.category is not None
                     and "internet_load" not in md_request.cache_algo):
             from findatapy.market.datavendorweb import DataVendorFlatFile
@@ -91,7 +91,7 @@ class MarketDataGenerator(object):
             if data_source == "bloomberg":
                 try:
                     from findatapy.market.datavendorbbg import \
-                        DataVendorBBGOpen
+                            DataVendorBBGOpen
                     data_vendor = DataVendorBBGOpen()
                 except:
                     logger.warn("Bloomberg needs to be installed")
@@ -135,7 +135,7 @@ class MarketDataGenerator(object):
 
             elif data_source == "bitcoincharts":
                 from findatapy.market.datavendorweb import \
-                    DataVendorBitcoincharts
+                        DataVendorBitcoincharts
                 data_vendor = DataVendorBitcoincharts()
             elif data_source == "poloniex":
                 from findatapy.market.datavendorweb import DataVendorPoloniex
@@ -157,7 +157,7 @@ class MarketDataGenerator(object):
                 data_vendor = DataVendorBitmex()
             elif data_source == "alphavantage":
                 from findatapy.market.datavendorweb import \
-                    DataVendorAlphaVantage
+                        DataVendorAlphaVantage
                 data_vendor = DataVendorAlphaVantage()
             elif data_source == "huobi":
                 from findatapy.market.datavendorweb import DataVendorHuobi
@@ -167,8 +167,7 @@ class MarketDataGenerator(object):
             elif data_source in md_request.data_vendor_custom:
                 data_vendor = md_request.data_vendor_custom[data_source]
             else:
-                logger.warn(str(data_source) +
-                            " is an unrecognized data source")
+                logger.warn(f"{str(data_source)} is an unrecognized data source")
 
         return data_vendor
 
@@ -187,35 +186,31 @@ class MarketDataGenerator(object):
         """
         logger = LoggerManager().getLogger(__name__)
 
-        # data_vendor = self.get_data_vendor(md_request.data_source)
-
-        # Check if tickers have been specified (if not load all of them for a 
-        # category)
-        # also handle single tickers/list tickers
-        create_tickers = False
-
         if md_request.vendor_tickers is not None \
-                and md_request.tickers is None:
+                    and md_request.tickers is None:
             md_request.tickers = md_request.vendor_tickers
 
         tickers = md_request.tickers
 
-        if tickers is None:
-            create_tickers = True
-        elif isinstance(tickers, str):
-            if tickers == "": create_tickers = True
-        elif isinstance(tickers, list):
-            if tickers == []: create_tickers = True
-
+        create_tickers = (
+            tickers is not None
+            and isinstance(tickers, str)
+            and tickers == ""
+            or tickers is not None
+            and not isinstance(tickers, str)
+            and isinstance(tickers, list)
+            and tickers == []
+            or tickers is None
+        )
         if create_tickers:
             md_request.tickers = ConfigManager().get_instance()\
-                .get_tickers_list_for_category(
+                    .get_tickers_list_for_category(
                     md_request.category, md_request.data_source,
                     md_request.freq, md_request.cut)
 
             if md_request.pretransformation is not None:
                 df_tickers = ConfigManager().get_instance()\
-                    .get_dataframe_tickers()
+                        .get_dataframe_tickers()
 
                 df_tickers = df_tickers[
                     (df_tickers["category"] == md_request.category) &
@@ -225,7 +220,7 @@ class MarketDataGenerator(object):
 
                 if "pretransformation" in df_tickers.columns:
                     md_request.pretransformation = \
-                        df_tickers["pretransformation"].tolist()
+                            df_tickers["pretransformation"].tolist()
 
         # intraday or tick: only one ticker per cache file
         if md_request.freq in ["intraday", "tick", "second", "hour",
@@ -243,27 +238,23 @@ class MarketDataGenerator(object):
         if md_request.cache_algo == "cache_algo":
             logger.debug(
                 "Only caching data in memory, do not return any time series.")
-            
+
             return
 
         # Only return time series if specified in the algo
         if "return" in md_request.cache_algo:
             # Special case for events/events-dt which is not indexed like other 
             # tables (also same for downloading futures contracts dates)
-            if md_request.category is not None:
-                if "events" in md_request.category:
-                    return df_agg
+            if md_request.category is not None and "events" in md_request.category:
+                return df_agg
 
             # Pad columns a second time (is this necessary to do here again?)
             # TODO only do this for not daily data?
             try:
                 if df_agg is not None:
-                    filter_by_column_names = True
-
-                    for col in df_agg.columns:
-                        if "all-vintages" in col:
-                            filter_by_column_names = False
-
+                    filter_by_column_names = all(
+                        "all-vintages" not in col for col in df_agg.columns
+                    )
                     df_agg = self._filter.filter_time_series(
                         md_request, df_agg, pad_columns=True,
                         filter_by_column_names=filter_by_column_names)
@@ -283,8 +274,7 @@ class MarketDataGenerator(object):
                         if "dropna" in md_request.resample_how:
                             df_agg = df_agg.dropna(how="all")
                 else:
-                    logger.warn("No data returned for " + str(
-                        md_request.tickers))
+                    logger.warn(f"No data returned for {str(md_request.tickers)}")
 
                 return df_agg
             except Exception as e:
@@ -294,9 +284,7 @@ class MarketDataGenerator(object):
 
                 import traceback
 
-                logger.warn(
-                    "No data returned for " 
-                    + str(md_request.tickers) + ", " + str(e))
+                logger.warn(f"No data returned for {str(md_request.tickers)}, {str(e)}")
 
                 return None
 
@@ -340,12 +328,12 @@ class MarketDataGenerator(object):
 
         ticker_cycle = 0
 
-        df_group = []
-
         # Single threaded version
         # handle intraday ticker calls separately one by one
         if len(md_request.tickers) == 1 or constants.market_thread_no[
             "other"] == 1:
+            df_group = []
+
             for ticker in md_request.tickers:
                 md_request_single = copy.copy(md_request)
                 md_request_single.tickers = ticker
@@ -359,12 +347,11 @@ class MarketDataGenerator(object):
                     md_request)
 
                 # If the vendor doesn"t provide any data, don"t attempt to append
-                if df_single is not None:
-                    if df_single.empty == False:
-                        df_single.index.name = "Date"
-                        df_single = df_single.astype("float32")
+                if df_single is not None and df_single.empty == False:
+                    df_single.index.name = "Date"
+                    df_single = df_single.astype("float32")
 
-                        df_group.append(df_single)
+                    df_group.append(df_single)
 
             # If you call for returning multiple tickers, be careful with 
             # memory considerations!
@@ -407,7 +394,7 @@ class MarketDataGenerator(object):
         config = ConfigManager().get_instance()
 
         # In many cases no expiry is defined so skip them
-        for i in range(0, len(tickers)):
+        for i in range(len(tickers)):
             try:
                 expiry_date = config.get_expiry_for_ticker(
                     md_request.data_source, tickers[i])
@@ -431,16 +418,17 @@ class MarketDataGenerator(object):
                     # (we need this before there might be odd situations where 
                     # we run on an expiry date, but still want to get
                     # data right till expiry time)
-                    if md_request.category == "futures-contracts" \
-                            and md_request.freq == "intraday" \
-                            and self._days_expired_intraday_contract_download \
-                                > 0:
-
-                        if expiry_date + pd.Timedelta(
-                                days=
-                                self._days_expired_intraday_contract_download) \
-                                < current_date:
-                            tickers[i] = None
+                    if (
+                        md_request.category == "futures-contracts"
+                        and md_request.freq == "intraday"
+                        and self._days_expired_intraday_contract_download > 0
+                        and expiry_date
+                        + pd.Timedelta(
+                            days=self._days_expired_intraday_contract_download
+                        )
+                        < current_date
+                    ):
+                        tickers[i] = None
 
                     if vendor_tickers is not None and tickers[i] is None:
                         vendor_tickers[i] = None
@@ -453,21 +441,20 @@ class MarketDataGenerator(object):
 
         df_single = None
 
-        if len(md_request.tickers) > 0:
+        if md_request.tickers:
             df_single = self.get_data_vendor(
                 md_request).load_ticker(md_request)
 
-        if df_single is not None:
-            if df_single.empty == False:
-                df_single.index.name = "Date"
+        if df_single is not None and df_single.empty == False:
+            df_single.index.name = "Date"
 
-                # Will fail for DataFrames which includes dates/strings 
-                # eg. futures contract names
-                df_single = Calculations().convert_to_numeric_dataframe(
-                    df_single)
+            # Will fail for DataFrames which includes dates/strings 
+            # eg. futures contract names
+            df_single = Calculations().convert_to_numeric_dataframe(
+                df_single)
 
-                if md_request.freq == "second":
-                    df_single = df_single.resample("1s")
+            if md_request.freq == "second":
+                df_single = df_single.resample("1s")
 
         return df_single
 
@@ -477,13 +464,13 @@ class MarketDataGenerator(object):
 
         df_agg = None
 
-        thread_no = constants.market_thread_no["other"]
-
         if market_data_request_list[
             0].data_source in constants.market_thread_no:
             thread_no = constants.market_thread_no[
-                market_data_request_list[0].data_source]
-
+                market_data_request_list[0].data_source
+            ]
+        else:
+            thread_no = constants.market_thread_no["other"]
         if thread_no > 0:
             pool = SwimPool().create_pool(
                 thread_technique=constants.market_thread_technique,
@@ -498,27 +485,25 @@ class MarketDataGenerator(object):
             pool.close()
             pool.join()
         else:
-            df_group = []
-
-            for md_request in market_data_request_list:
-                df_group.append(
-                    self.fetch_single_time_series(md_request))
-
+            df_group = [
+                self.fetch_single_time_series(md_request)
+                for md_request in market_data_request_list
+            ]
         # Collect together all the time series
         if df_group is not None:
             df_group = [i for i in df_group if i is not None]
 
-            if df_group is not None:
-                try:
-                    df_agg = self._calculations.join(df_group,
-                                                             how="outer")
+        if df_group is not None:
+            try:
+                df_agg = self._calculations.join(df_group,
+                                                         how="outer")
 
-                    # Force ordering to be the same!
-                    # df_agg = df_agg[columns]
-                except Exception as e:
-                    logger.warning(
-                        "Possible overlap of columns? Have you specifed same "
-                        "ticker several times: " + str(e))
+                # Force ordering to be the same!
+                # df_agg = df_agg[columns]
+            except Exception as e:
+                logger.warning(
+                    f"Possible overlap of columns? Have you specifed same ticker several times: {str(e)}"
+                )
 
         return df_agg
 
@@ -539,13 +524,9 @@ class MarketDataGenerator(object):
         key = MarketDataRequest().create_category_key(
             md_request=md_request)
 
-        is_key_overriden = False
-
-        for k in constants.override_multi_threading_for_categories:
-            if k in key:
-                is_key_overriden = True
-                break
-
+        is_key_overriden = any(
+            k in key for k in constants.override_multi_threading_for_categories
+        )
         # By default use other
         thread_no = constants.market_thread_no["other"]
 
@@ -556,10 +537,10 @@ class MarketDataGenerator(object):
         # Daily data does not include ticker in the key, as multiple tickers 
         # in the same file
         if thread_no == 1 or ".csv" in str(md_request.data_source) or \
-                ".h5" in str(
+                    ".h5" in str(
             md_request.data_source) or ".parquet" in str(
             md_request.data_source) \
-                or ".zip" in str(
+                    or ".zip" in str(
             md_request.data_source) or md_request.data_engine is not None:
             # df_agg = data_vendor.load_ticker(md_request)
             df_agg = self.fetch_single_time_series(md_request)
@@ -577,26 +558,22 @@ class MarketDataGenerator(object):
             for i in range(0, len(md_request.tickers), group_size):
                 md_request_single = copy.copy(md_request)
                 md_request_single.tickers = \
-                    md_request.tickers[i:i + group_size]
+                        md_request.tickers[i:i + group_size]
 
                 if md_request.vendor_tickers is not None:
                     md_request_single.vendor_tickers = \
-                        md_request.vendor_tickers[i:i + group_size]
+                            md_request.vendor_tickers[i:i + group_size]
 
                 if md_request.pretransformation is not None:
                     md_request_single.pretransformation = \
-                        md_request.pretransformation[i:i + group_size]
+                            md_request.pretransformation[i:i + group_size]
 
                 md_request_list.append(md_request_single)
 
             # Special case where we make smaller calls one after the other
             if is_key_overriden:
 
-                df_list = []
-
-                for md in md_request_list:
-                    df_list.append(self.fetch_single_time_series(md))
-
+                df_list = [self.fetch_single_time_series(md) for md in md_request_list]
                 df_agg = self._calculations.join(df_list,
                                                          how="outer")
             else:

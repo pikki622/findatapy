@@ -29,7 +29,6 @@ class CacheManager(object):
         if CacheManager._is_init == 0:
             # CacheManager.populate_time_series_dictionaries()
             CacheManager._is_init = 1
-        pass
 
     ### time series ticker manipulators
     @staticmethod

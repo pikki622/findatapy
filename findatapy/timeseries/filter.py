@@ -101,7 +101,7 @@ class Filter(object):
         """
 
         # Optimal case for weekdays: remove Saturday and Sunday
-        if (cal == 'WEEKDAY' or cal == 'WKY'):
+        if cal in ['WEEKDAY', 'WKY']:
             return data_frame[data_frame.index.dayofweek <= 4]
 
         # Select only those holidays in the sample
@@ -147,7 +147,7 @@ class Filter(object):
         data_frame_left = data_frame
         data_frame_filtered = []
 
-        for i in range(0, len(holidays_start)):
+        for i in range(len(holidays_start)):
             data_frame_temp = data_frame_left[
                 data_frame_left.index < holidays_start[i]]
             data_frame_left = data_frame_left[
@@ -410,9 +410,7 @@ class Filter(object):
         data_frame = data_frame[data_frame.index.minute == minute]
         data_frame = data_frame[data_frame.index.hour == hour]
 
-        data_frame = data_frame.tz_convert(old_tz)
-
-        return data_frame
+        return data_frame.tz_convert(old_tz)
 
     def filter_time_series_by_time_of_day(self, hour, minute, data_frame,
                                           in_tz=None, out_tz=None):
@@ -448,9 +446,7 @@ class Filter(object):
             data_frame.index = pd.DatetimeIndex(data_frame.index.values)
 
         data_frame = data_frame[data_frame.index.minute == minute]
-        data_frame = data_frame[data_frame.index.hour == hour]
-
-        return data_frame
+        return data_frame[data_frame.index.hour == hour]
 
     def filter_time_series_by_minute_of_hour(self, minute, data_frame,
                                              in_tz=None, out_tz=None):
@@ -503,9 +499,7 @@ class Filter(object):
         """
 
         data_frame = data_frame[data_frame.index.hour <= finish_hour]
-        data_frame = data_frame[data_frame.index.hour >= start_hour]
-
-        return data_frame
+        return data_frame[data_frame.index.hour >= start_hour]
 
     def filter_time_series_by_columns(self, columns, data_frame):
         """Filter time series by certain columns
@@ -521,10 +515,7 @@ class Filter(object):
         -------
         DataFrame
         """
-        if data_frame is not None and columns is not None:
-            return data_frame[columns]
-
-        return None
+        return None if data_frame is None or columns is None else data_frame[columns]
 
     def pad_time_series_columns(self, columns, data_frame):
         """Selects time series from a dataframe and if necessary creates
@@ -549,7 +540,7 @@ class Filter(object):
 
         data_frame = data_frame[common_columns]
 
-        if len(uncommon_columns) > 0:
+        if uncommon_columns:
             logger = LoggerManager().getLogger(__name__)
 
             logger.info(
@@ -564,19 +555,10 @@ class Filter(object):
             # problems with newer pandas versions)
             # or to NaT if they are date columns
             for u in uncommon_columns:
-                is_date = False
-
-                for c in constants.always_date_columns:
-                    if c in u:
-                        is_date = True
-
-                if is_date:
-                    data_frame[u] = np.datetime64('NaT')
-                else:
-                    data_frame[u] = np.nan
-
-            # SLOW method below
-            # for x in uncommon_columns: data_frame.loc[:,x] = np.nan
+                is_date = any(c in u for c in constants.always_date_columns)
+                data_frame[u] = np.datetime64('NaT') if is_date else np.nan
+                # SLOW method below
+                # for x in uncommon_columns: data_frame.loc[:,x] = np.nan
 
         # Get columns in same order again
         data_frame = data_frame[columns]
@@ -602,12 +584,9 @@ class Filter(object):
         if not (isinstance(keyword, list)):
             keyword = [keyword]
 
-        columns = []
-
-        for k in keyword:
-            columns.append(
-                [elem for elem in data_frame.columns if k not in elem])
-
+        columns = [
+            [elem for elem in data_frame.columns if k not in elem] for k in keyword
+        ]
         columns = self._calendar.flatten_list_of_lists(columns)
 
         return self.filter_time_series_by_columns(columns, data_frame)
@@ -635,14 +614,14 @@ class Filter(object):
         columns = []
 
         if ignore_case:
-            for k in keyword:
-                columns.append([elem for elem in data_frame.columns if
-                                k.lower() in elem.lower()])
+            columns.extend(
+                [elem for elem in data_frame.columns if k.lower() in elem.lower()]
+                for k in keyword
+            )
         else:
-            for k in keyword:
-                columns.append(
-                    [elem for elem in data_frame.columns if k in elem])
-
+            columns.extend(
+                [elem for elem in data_frame.columns if k in elem] for k in keyword
+            )
         columns = self._calendar.flatten_list_of_lists(columns)
 
         return self.filter_time_series_by_columns(columns, data_frame)
@@ -687,9 +666,7 @@ class Filter(object):
 
         # Create ticker.field combination for series we wish to return
         for f in fields:
-            for t in tickers:
-                tickers_fields_list.append(t + '.' + f)
-
+            tickers_fields_list.extend(t + '.' + f for t in tickers)
         return tickers_fields_list
 
     def resample_time_series(self, data_frame, freq):
@@ -749,10 +726,9 @@ class Filter(object):
         data_frame = data_frame[~((data_frame.index.dayofweek == 5))]
         data_frame = data_frame[~((data_frame.index.dayofweek == 6) & (
                     data_frame.index.hour < 19))]
-        data_frame = data_frame[
-            ~((data_frame.index.day == 1) & (data_frame.index.month == 1))]
-
-        return data_frame
+        return data_frame[
+            ~((data_frame.index.day == 1) & (data_frame.index.month == 1))
+        ]
 
     def remove_duplicate_indices(self, df):
         return df[~df.index.duplicated(keep='first')]
@@ -785,7 +761,7 @@ class Filter(object):
         df_mask = pd.DataFrame(0, index=df.index, columns=['mask'])
 
         # Mask data with each given tuple
-        for i in range(0, len(time_list)):
+        for i in range(len(time_list)):
             start_hour = int(time_list[i][0].split(':')[0])
             start_minute = int(time_list[i][0].split(':')[1])
             end_hour = int(time_list[i][1].split(':')[0])

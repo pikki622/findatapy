@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     run_example = 4
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ####### DukasCopy examples
         # let"s download data for 14 Jun 2016 for EUR/USD - the raw data has
         # bid/ask, if we specify close, we calculate
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         df = market.fetch_market(md_request)
         print(df.tail(n=10))
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         ####### Quandl data examples
 
         # for this to work make sure you edit the Quandl API key in
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         df = market.fetch_market(md_request)
         print(df.tail(n=10))
 
-    if run_example == 3 or run_example == 0:
+    if run_example in {3, 0}:
         ####### FRED example
 
         # if we give it a cross which doesn"t exist in the database directly,
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         df = market.fetch_market(md_request)
         print(df.tail(n=10))
 
-    if run_example == 4 or run_example == 0:
+    if run_example in {4, 0}:
         ####### Bloomberg
 
         # now we will try various examples with Bloomberg
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         df = market.fetch_market(md_request)
         print(df.tail(n=10))
 
-    if run_example == 5 or run_example == 0:
+    if run_example in {5, 0}:
         ####### Bloomberg
 
         # let"s now try downloading tick data for the past hour from Bloomberg,
@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
         print(df.tail(n=60))
 
-    if run_example == 6 or run_example == 0:
+    if run_example in {6, 0}:
         ####### FXCM (and compare with DukasCopy) examples
 
         # let"s download data for end of 2016/start 2017 for EUR/USD - the
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         md_request.data_source = "dukascopy"
         df1 = market.fetch_market(md_request).resample("1min").mean()
 
-        df1.columns = [c + "_dk" for c in df1.columns]
+        df1.columns = [f"{c}_dk" for c in df1.columns]
         df = df1.join(df)
 
         print(df_tick.tail(n=100))
