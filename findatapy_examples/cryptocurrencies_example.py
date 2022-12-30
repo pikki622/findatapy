@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     run_example = 1
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         ####### Bloomberg
 
         # Now we will try various examples with Bloomberg

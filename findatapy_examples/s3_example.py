@@ -69,7 +69,7 @@ run_example = 2
 
 folder = "s3://type_your_s3_bucket_here"
 
-if run_example == 1 or run_example == 0:
+if run_example in {1, 0}:
     md_request = MarketDataRequest(
         start_date="04 Jan 2021",
         finish_date="05 Jan 2021",
@@ -94,7 +94,7 @@ if run_example == 1 or run_example == 0:
     IOEngine().write_time_series_cache_to_disk(folder, df, engine="parquet",
                                                md_request=md_request)
 
-    md_request.data_engine = folder + "/*.parquet"
+    md_request.data_engine = f"{folder}/*.parquet"
 
     df = market.fetch_market(md_request)
 
@@ -117,10 +117,10 @@ if run_example == 1 or run_example == 0:
 
     print(df)
 
-if run_example == 2 or run_example == 0:
+if run_example in {2, 0}:
     io_engine = IOEngine()
 
-    pattern = folder + "/*.parquet"
+    pattern = f"{folder}/*.parquet"
 
     matched_files = io_engine.list_files(pattern)
 

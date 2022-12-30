@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # and final) for US
     run_example = 2
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         # Download event data from Bloomberg
         # we have to use the special category "events" keyword for economic
         # data events
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
         print(df)
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         # Download Advance, Preliminary and Final estimates for US GDP and
         # US payrolls (With Bloomberg, we internally set the correct overrides
         # to fetch the correct series for GDP

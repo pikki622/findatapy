@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     run_example = 4
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         md_request = MarketDataRequest(
             start_date="01 Jan 2002", finish_date="31 Jan 2016",
             tickers="S&P500",
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
         print(df)
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         # load tick data from DukasCopy and then resample to 15s buckets
         md_request = MarketDataRequest(
             start_date="01 Jun 2016", finish_date="31 Jul 2016",
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
         print(df)
 
-    if run_example == 4:
+    elif run_example == 4:
         # In this case we are saving predefined tick data tickers to disk, and
         # then reading back using the MarketDataRequest interface
         from findatapy.util.dataconstants import DataConstants

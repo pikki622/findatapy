@@ -41,12 +41,10 @@ class Market(object):
 
     def __init__(self, market_data_generator=None, md_request=None):
         if market_data_generator is None:
-            if constants.default_market_data_generator\
-                    == "marketdatagenerator":
-                from findatapy.market import MarketDataGenerator
-                market_data_generator = MarketDataGenerator()
-            elif constants.default_market_data_generator \
-                    == 'cachedmarketdatagenerator':
+            if (
+                constants.default_market_data_generator
+                == 'cachedmarketdatagenerator'
+            ):
                 # NOT CURRENTLY IMPLEMENTED FOR FUTURE USE
                 from finaddpy.market import CachedMarketDataGenerator
                 market_data_generator = CachedMarketDataGenerator()

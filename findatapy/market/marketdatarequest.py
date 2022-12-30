@@ -66,11 +66,7 @@ class MarketDataRequest(object):
         """
         from findatapy.market.ioengine import SpeedCache
 
-        if self.freq == "daily":
-            ticker = None
-        else:
-            ticker = self.tickers[0]
-
+        ticker = None if self.freq == "daily" else self.tickers[0]
         self.__category_key = self.create_category_key(
             md_request=self, ticker=ticker)
 
@@ -271,7 +267,7 @@ class MarketDataRequest(object):
             self.data_vendor_custom = data_vendor_custom
 
     def __str__(self):
-        return "MarketDataRequest summary - " + self.generate_key()
+        return f"MarketDataRequest summary - {self.generate_key()}"
 
     def create_category_key(self, md_request=None, ticker=None):
         """Returns a category key for the associated MarketDataRequest, which 
@@ -289,8 +285,6 @@ class MarketDataRequest(object):
         """
 
         category = "default-cat"
-        cut = "default-cut"
-
         if md_request is None:
             md_request = self
 
@@ -300,21 +294,15 @@ class MarketDataRequest(object):
         source = md_request.data_source
         freq = md_request.freq
 
-        if ticker is None and (md_request.freq == "intraday" 
-                               or md_request.freq == "tick"):
+        if ticker is None and md_request.freq in ["intraday", "tick"]:
             ticker = md_request.tickers[0]
 
-        if md_request.cut is not None: cut = md_request.cut
-
-        if (ticker is not None):
-            key = str(environment) + "." + str(category) + "." + str(source) \
-                  + "." + str(freq) + "." + str(cut) \
-                  + "." + str(ticker)
-        else:
-            key = str(environment) + "." + str(category) + "." + str(source) \
-                  + "." + str(freq) + "." + str(cut)
-
-        return key
+        cut = md_request.cut if md_request.cut is not None else "default-cut"
+        return (
+            f"{str(environment)}.{str(category)}.{str(source)}.{str(freq)}.{str(cut)}.{str(ticker)}"
+            if (ticker is not None)
+            else f"{str(environment)}.{str(category)}.{str(source)}.{str(freq)}.{str(cut)}"
+        )
 
     @property
     def data_source(self):
@@ -327,7 +315,7 @@ class MarketDataRequest(object):
                                  "gain", "google", "quandl", "yahoo",
                                  "boe", "eikon"]
 
-            if not data_source in valid_data_source:
+            if data_source not in valid_data_source:
                 LoggerManager().getLogger(__name__).warning(
                     data_source & " is not a defined data source.")
         except:
@@ -349,9 +337,8 @@ class MarketDataRequest(object):
 
     @tickers.setter
     def tickers(self, tickers):
-        if tickers is not None:
-            if not isinstance(tickers, list):
-                tickers = [tickers]
+        if tickers is not None and not isinstance(tickers, list):
+            tickers = [tickers]
 
         config = None
 
@@ -365,7 +352,7 @@ class MarketDataRequest(object):
                     if tick[-1] == "*" and tick[0] != "*":
                         start = "^"
 
-                    tick = start + "(" + tick.replace("*", "") + ")"
+                    tick = f"{start}(" + tick.replace("*", "") + ")"
 
                     if config is None:
                         from findatapy.util import ConfigManager
@@ -405,7 +392,7 @@ class MarketDataRequest(object):
             fields = [fields]
 
         for field_entry in fields:
-            if not field_entry in valid_fields:
+            if field_entry not in valid_fields:
                 i = 0
                 # self.logger.warning(field_entry + " is not a valid field.")
 
@@ -419,9 +406,8 @@ class MarketDataRequest(object):
 
     @vendor_tickers.setter
     def vendor_tickers(self, vendor_tickers):
-        if vendor_tickers is not None:
-            if not isinstance(vendor_tickers, list):
-                vendor_tickers = [vendor_tickers]
+        if vendor_tickers is not None and not isinstance(vendor_tickers, list):
+            vendor_tickers = [vendor_tickers]
 
         self.__vendor_tickers = vendor_tickers
 
@@ -431,9 +417,8 @@ class MarketDataRequest(object):
 
     @vendor_fields.setter
     def vendor_fields(self, vendor_fields):
-        if vendor_fields is not None:
-            if not isinstance(vendor_fields, list):
-                vendor_fields = [vendor_fields]
+        if vendor_fields is not None and not isinstance(vendor_fields, list):
+            vendor_fields = [vendor_fields]
 
         self.__vendor_fields = vendor_fields
 
@@ -449,7 +434,7 @@ class MarketDataRequest(object):
                       "daily", "weekly", "monthly", "quarterly",
                       "annually"]
 
-        if not freq in valid_freq:
+        if freq not in valid_freq:
             LoggerManager().getLogger(__name__).warning(freq + 
                                                         " is not a defined frequency")
 
@@ -468,9 +453,10 @@ class MarketDataRequest(object):
                                "pseudodaily", "daily", "weekly", "monthly",
                                "quarterly", "annually"]
 
-            if not gran_freq in valid_gran_freq:
+            if gran_freq not in valid_gran_freq:
                 LoggerManager().getLogger(__name__).warning(
-                    gran_freq + " is not a defined frequency")
+                    f"{gran_freq} is not a defined frequency"
+                )
 
             if gran_freq in ["minute", "hourly"]:
                 self.__freq = "intraday"
@@ -630,7 +616,7 @@ class MarketDataRequest(object):
         valid_cache_algo = ["internet_load", "internet_load_return", 
                             "cache_algo", "cache_algo_return"]
 
-        if not cache_algo in valid_cache_algo:
+        if cache_algo not in valid_cache_algo:
             LoggerManager().getLogger(__name__).warning(cache_algo + 
                                                         " is not a defined caching scheme")
 
@@ -646,9 +632,10 @@ class MarketDataRequest(object):
 
         valid_environment = DataConstants().possible_data_environment
 
-        if not environment in valid_environment:
+        if environment not in valid_environment:
             LoggerManager().getLogger(__name__).warning(
-                environment + " is not a defined environment.")
+                f"{environment} is not a defined environment."
+            )
 
         self.__environment = environment
 
@@ -662,9 +649,10 @@ class MarketDataRequest(object):
 
         valid_trade_side = ["trade", "bid", "ask"]
 
-        if not trade_side in valid_trade_side:
+        if trade_side not in valid_trade_side:
             LoggerManager().getLogger(__name__).warning(
-                trade_side + " is not a defined trade side.")
+                f"{trade_side} is not a defined trade side."
+            )
 
         self.__trade_side = trade_side
 

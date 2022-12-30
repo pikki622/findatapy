@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     run_example = 0
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         # Get the holidays (which aren"t weekends)
         print(calendar.get_holidays(start_date="01 Jan 1999 00:50",
                                     end_date="31 Dec 1999", cal="FX"))
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         print(calendar.get_holidays(start_date="01 Jan 1999 00:50",
                                     end_date="31 Dec 1999", cal="WKD"))
 
-    if run_example == 2 or run_example == 0:
+    if run_example in {2, 0}:
         # Get delivery dates for these horizon dates - typically would use 
         # to get forward maturities
         print(calendar.get_delivery_date_from_horizon_date(
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         print(calendar.get_expiry_date_from_horizon_date(
             pd.to_datetime([pd.Timestamp("26 Oct 2020")]), "1M", cal="EURUSD"))
 
-    if run_example == 3 or run_example == 0:
+    if run_example in {3, 0}:
         # Create a list of business days and one which is + 1 day
 
         bus_days = pd.bdate_range("1 Jan 2020", "30 Jan 2020")
@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
         print(calendar.get_delta_between_dates(bus_days, bus_days_plus))
 
-    if run_example == 4 or run_example == 0:
+    if run_example in {4, 0}:
         # Filter a time series by EURUSD holidays
 
         df = pd.DataFrame(index=pd.bdate_range("1 Jan 2020", "31 Dec 2020"))
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         print(len(df.index))
         print(len(df_filtered.index))
 
-    if run_example == 5 or run_example == 0:
+    if run_example in {5, 0}:
         # Get expiry for USDJPY
 
         # Get 1M expires for these horizon dates - typically would use to get

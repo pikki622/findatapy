@@ -92,7 +92,7 @@ class TickerFactory(object):
 
                                             i = i + 1
 
-        data_frame_out = data_frame_out[0:i]
+        data_frame_out = data_frame_out[:i]
 
         if out_csv_file is not None:
             data_frame_out.to_csv(out_csv_file)

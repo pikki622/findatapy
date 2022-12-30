@@ -61,8 +61,9 @@ if __name__ == '__main__':
     fields = cm.get_fields_list_for_category_str(categories[0])
 
     # We don't need to add the environment (eg. backtest)
-    print("For category " + quandl_category[0] + ", tickers = " + str(
-        tickers) + ", fields = " + str(fields))
+    print(
+        f"For category {quandl_category[0]}, tickers = {str(tickers)}, fields = {str(fields)}"
+    )
 
     # Do a more complicated query, get any combinations
     df = cm.free_form_tickers_regex_query(category='fx/*|equities/*',

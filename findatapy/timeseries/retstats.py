@@ -207,14 +207,16 @@ class RetStats(object):
 
         if self._rets is None: self.calculate_ret_stats()
 
-        stat_list = []
-
-        for i in range(0, len(self._rets.index)):
-            stat_list.append(self._rets.index[i] + " Ret = " + str(
-                round(self._rets[i] * 100, 1))
-                             + "% Vol = " + str(round(self._vol[i] * 100, 1))
-                             + "% IR = " + str(round(self._inforatio[i], 2))
-                             + " Dr = " + str(round(self._dd[i] * 100, 1))
-                             + "%")  # Kurt = " + str(round(self._kurtosis[i], 2)))
-
-        return stat_list
+        return [
+            self._rets.index[i]
+            + " Ret = "
+            + str(round(self._rets[i] * 100, 1))
+            + "% Vol = "
+            + str(round(self._vol[i] * 100, 1))
+            + "% IR = "
+            + str(round(self._inforatio[i], 2))
+            + " Dr = "
+            + str(round(self._dd[i] * 100, 1))
+            + "%"
+            for i in range(len(self._rets.index))
+        ]

@@ -86,9 +86,12 @@ class SwimPool(object):
         return self._pool
 
     def close_pool(self, pool, force_process_respawn=False):
-        if pool is not None:
-            if (self._thread_technique != 'multiprocessing' and
-                self._multiprocessing_library != 'pathos') \
-                    or force_process_respawn:
-                pool.close()
-                pool.join()
+        if pool is not None and (
+            (
+                self._thread_technique != 'multiprocessing'
+                and self._multiprocessing_library != 'pathos'
+            )
+            or force_process_respawn
+        ):
+            pool.close()
+            pool.join()

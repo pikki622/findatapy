@@ -42,15 +42,14 @@ class FXConv(object):
 
         g10_crosses = []
 
-        for i in range(0, len(self.g10)):
-            for j in range(0, len(self.g10)):
-                if i != j:
-                    g10_crosses.append(self.correct_notation(self.g10[i] + self.g10[j]))
-
+        for i in range(len(self.g10)):
+            g10_crosses.extend(
+                self.correct_notation(self.g10[i] + self.g10[j])
+                for j in range(len(self.g10))
+                if i != j
+            )
         set_val = set(g10_crosses)
-        g10_crosses = sorted(list(set_val))
-
-        return g10_crosses
+        return sorted(list(set_val))
 
     def em_or_g10(self, currency, freq = "daily"):
         if freq == 'intraday':
@@ -61,49 +60,40 @@ class FXConv(object):
         except ValueError:
             index = -1
 
-        if (index < 0):
-            return 'fx-em'
-
-        return 'fx-g10'
+        return 'fx-em' if (index < 0) else 'fx-g10'
 
     def is_USD_base(self, cross):
-        base = cross[0:3]
+        base = cross[:3]
         terms = cross[3:6]
 
-        if base == 'USD':
-            return True
-
-        return False
+        return base == 'USD'
 
     def is_EM_cross(self, cross):
-        base = cross[0:3]
+        base = cross[:3]
         terms = cross[3:6]
 
-        if self.em_or_g10(base, 'daily') == 'fx-em' or self.em_or_g10(terms, 'daily') == 'fx-em':
-            return True
-
-        return False
+        return (
+            self.em_or_g10(base, 'daily') == 'fx-em'
+            or self.em_or_g10(terms, 'daily') == 'fx-em'
+        )
 
     def is_NDF_cross(self, cross):
-        base = cross[0:3]
+        base = cross[:3]
         terms = cross[3:6]
 
-        if base in self.ndf or terms in self.ndf:
-            return True
-
-        return False
+        return base in self.ndf or terms in self.ndf
 
     def decompose_pair_into_USD_crosses(self, cross):
-        base = cross[0:3]
+        base = cross[:3]
         terms = cross[3:6]
 
         if base == 'USD' or terms == 'USD':
             return cross, 'USDUSD'
 
-        return base + 'USD', 'USD' + terms
+        return f'{base}USD', f'USD{terms}'
 
     def correct_notation(self, cross):
-        base = cross[0:3]
+        base = cross[:3]
         terms = cross[3:6]
 
         try:
@@ -118,13 +108,15 @@ class FXConv(object):
 
         if (base_index < 0 and terms_index > 0):
             return terms + base
-        if (base_index > 0 and terms_index < 0):
+        if (
+            base_index > 0
+            and terms_index < 0
+            or base_index <= terms_index
+            and (terms_index > base_index)
+        ):
             return base + terms
-        elif (base_index > terms_index):
+        elif base_index > terms_index:
             return terms + base
-        elif (terms_index > base_index):
-            return base + terms
-
         return cross
 
 if __name__ == '__main__':
@@ -132,5 +124,4 @@ if __name__ == '__main__':
 
     fxconv = FXConv()
 
-    if True:
-        logger.info(fxconv.g10_crosses())
+    logger.info(fxconv.g10_crosses())

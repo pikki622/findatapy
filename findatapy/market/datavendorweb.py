@@ -85,72 +85,67 @@ class DataVendorQuandl(DataVendor):
 
         if data_frame is None or data_frame.index is []: return None
 
-        # convert from vendor to findatapy tickers/fields
-        if data_frame is not None:
-            returned_tickers = data_frame.columns
+        returned_tickers = data_frame.columns
 
-        if data_frame is not None:
-            # tidy up tickers into a format that is more easily translatable
-            # we can often get multiple fields returned (even if we don't ask 
-            # for them!)
-            # convert to lower case
-            returned_fields = [
-                (x.split(' - ')[1]).lower().replace(' ', '-')
-                    .replace('.', '-').replace('--', '-') for x
-                in returned_tickers]
+        # tidy up tickers into a format that is more easily translatable
+        # we can often get multiple fields returned (even if we don't ask 
+        # for them!)
+        # convert to lower case
+        returned_fields = [
+            (x.split(' - ')[1]).lower().replace(' ', '-')
+                .replace('.', '-').replace('--', '-') for x
+            in returned_tickers]
 
-            returned_fields = [x.replace('value', 'close') for x in
-                               returned_fields]  # special case for close
+        returned_fields = [x.replace('value', 'close') for x in
+                           returned_fields]  # special case for close
 
             # quandl doesn't always return the field name
-            for i in range(0, len(returned_fields)):
-                ticker = returned_tickers[i].split('/')[1].split(' - ')[
-                    0].lower()
+        for i in range(len(returned_fields)):
+            ticker = returned_tickers[i].split('/')[1].split(' - ')[
+                0].lower()
 
-                if ticker == returned_fields[i]:
-                    returned_fields[i] = 'close'
+            if ticker == returned_fields[i]:
+                returned_fields[i] = 'close'
 
             # replace time fields (can cause problems later for times to start 
             # with 0)
-            for i in range(0, 10):
-                returned_fields = [
-                    x.replace('0' + str(i) + ':00', str(i) + ':00') for x in
-                    returned_fields]
+        for i in range(10):
+            returned_fields = [
+                x.replace(f'0{str(i)}:00', f'{str(i)}:00') for x in returned_fields
+            ]
 
-            returned_tickers = [x.replace('.', '/') for x in returned_tickers]
-            returned_tickers = [x.split(' - ')[0] for x in returned_tickers]
+        returned_tickers = [x.replace('.', '/') for x in returned_tickers]
+        returned_tickers = [x.split(' - ')[0] for x in returned_tickers]
 
+        try:
+            fields = self.translate_from_vendor_field(returned_fields,
+                                                      md_request)
+            tickers = self.translate_from_vendor_ticker(returned_tickers,
+                                                        md_request)
+        except:
+            print('error')
+
+        ticker_combined = []
+
+        for i in range(len(tickers)):
             try:
-                fields = self.translate_from_vendor_field(returned_fields,
-                                                          md_request)
-                tickers = self.translate_from_vendor_ticker(returned_tickers,
-                                                            md_request)
+                ticker_combined.append(tickers[i] + "." + fields[i])
             except:
-                print('error')
+                ticker_combined.append(tickers[i] + ".close")
 
-            ticker_combined = []
+        data_frame.columns = ticker_combined
+        data_frame.index.name = 'Date'
 
-            for i in range(0, len(tickers)):
-                try:
-                    ticker_combined.append(tickers[i] + "." + fields[i])
-                except:
-                    ticker_combined.append(tickers[i] + ".close")
-
-            data_frame.columns = ticker_combined
-            data_frame.index.name = 'Date'
-
-        logger.info(
-            "Completed request from Quandl for " + str(ticker_combined))
+        logger.info(f"Completed request from Quandl for {ticker_combined}")
 
         return data_frame
 
     def download_daily(self, md_request):
         logger = LoggerManager().getLogger(__name__)
 
-        trials = 0
-
         data_frame = None
 
+        trials = 0
         while (trials < 5):
             try:
                 data_frame = Quandl.get(md_request.tickers,
@@ -160,17 +155,13 @@ class DataVendorQuandl(DataVendor):
 
                 break
             except SyntaxError:
-                logger.error(
-                    "The tickers %s do not exist on Quandl." %
-                    md_request.tickers)
+                logger.error(f"The tickers {md_request.tickers} do not exist on Quandl.")
                 break
             except Exception as e:
-                trials = trials + 1
+                trials += 1
                 logger.info(
-                    "Attempting... " + str(
-                        trials) + " request to download from Quandl due to "
-                                  "following error: " + str(
-                        e))
+                    f"Attempting... {trials} request to download from Quandl due to following error: {str(e)}"
+                )
 
         if trials == 5:
             logger.error(
@@ -215,43 +206,36 @@ class DataVendorEikon(DataVendor):
 
         if data_frame is None or data_frame.index is []: return None
 
-        # Convert from vendor to findatapy tickers/fields
-        # if data_frame is not None:
-        #     returned_tickers = data_frame.columns
+        # Tidy up tickers into a format that is more easily translatable
+        # we can often get multiple fields returned (even if we don't ask
+        # for them!)
+        # convert to lower case
+        returned_fields = md_request_vendor.fields
+        returned_tickers = []
 
-        if data_frame is not None:
-            # Tidy up tickers into a format that is more easily translatable
-            # we can often get multiple fields returned (even if we don't ask
-            # for them!)
-            # convert to lower case
-            returned_fields = md_request_vendor.fields
-            returned_tickers = []
+        for vi in md_request_vendor.tickers:
+            returned_tickers.extend(vi for _ in md_request_vendor.fields)
+        try:
+            fields = self.translate_from_vendor_field(returned_fields,
+                                                      md_request)
+            tickers = self.translate_from_vendor_ticker(returned_tickers,
+                                                        md_request)
+        except Exception:
+            logger.warning(
+                "Problems when converting from vendor ticker/field")
 
-            for vi in md_request_vendor.tickers:
-                for f in md_request_vendor.fields:
-                    returned_tickers.append(vi)
+        ticker_combined = []
 
+        for i in range(len(tickers)):
             try:
-                fields = self.translate_from_vendor_field(returned_fields,
-                                                          md_request)
-                tickers = self.translate_from_vendor_ticker(returned_tickers,
-                                                            md_request)
-            except Exception:
-                logger.warning(
-                    "Problems when converting from vendor ticker/field")
+                ticker_combined.append(tickers[i] + "." + fields[i])
+            except:
+                ticker_combined.append(tickers[i] + ".close")
 
-            ticker_combined = []
+        data_frame.columns = ticker_combined
+        data_frame.index.name = 'Date'
 
-            for i in range(0, len(tickers)):
-                try:
-                    ticker_combined.append(tickers[i] + "." + fields[i])
-                except:
-                    ticker_combined.append(tickers[i] + ".close")
-
-            data_frame.columns = ticker_combined
-            data_frame.index.name = 'Date'
-
-        logger.info("Completed request from Eikon for " + str(ticker_combined))
+        logger.info(f"Completed request from Eikon for {ticker_combined}")
 
         # print(data_frame)
         return data_frame
@@ -259,17 +243,16 @@ class DataVendorEikon(DataVendor):
     def download(self, md_request):
         logger = LoggerManager().getLogger(__name__)
 
-        trials = 0
-
         data_frame = None
 
-        if md_request.freq == 'tick':
-            freq = 'taq'  # Unofficial support https://community.developers.refinitiv.com/questions/48616/how-do-i-get-historical-ticks-using-python-eikon-p.html
-        elif md_request.freq == 'daily':
+        if md_request.freq == 'daily':
             freq = 'daily'
+        elif md_request.freq == 'tick':
+            freq = 'taq'  # Unofficial support https://community.developers.refinitiv.com/questions/48616/how-do-i-get-historical-ticks-using-python-eikon-p.html
         else:
             freq = 'minute'
 
+        trials = 0
         while (trials < 5):
             try:
                 # Can sometimes fail first time around
@@ -286,17 +269,13 @@ class DataVendorEikon(DataVendor):
                     interval=freq)
                 break
             except SyntaxError:
-                logger.error(
-                    "The tickers %s do not exist on Eikon."
-                    % md_request.tickers)
+                logger.error(f"The tickers {md_request.tickers} do not exist on Eikon.")
                 break
             except Exception as e:
-                trials = trials + 1
+                trials += 1
                 logger.info(
-                    "Attempting... " + str(
-                        trials) + " request to download from Eikon due to "
-                                  "following error: " + str(
-                        e))
+                    f"Attempting... {trials} request to download from Eikon due to following error: {str(e)}"
+                )
 
         if trials == 5:
             logger.error(
@@ -340,36 +319,28 @@ class DataVendorALFRED(DataVendor):
 
         if data_frame is None or data_frame.index is []: return None
 
-        # convert from vendor to findatapy tickers/fields
-        if data_frame is not None:
-            returned_tickers = data_frame.columns
+        returned_tickers = data_frame.columns
 
-        if data_frame is not None:
-            # tidy up tickers into a format that is more easily translatable
-            # we can often get multiple fields returned (even if we don't ask
-            # for them!)
-            # convert to lower case
-            returned_fields = [(x.split('.')[1]) for x in returned_tickers]
-            returned_tickers = [(x.split('.')[0]) for x in returned_tickers]
+        # tidy up tickers into a format that is more easily translatable
+        # we can often get multiple fields returned (even if we don't ask
+        # for them!)
+        # convert to lower case
+        returned_fields = [(x.split('.')[1]) for x in returned_tickers]
+        returned_tickers = [(x.split('.')[0]) for x in returned_tickers]
 
-            try:
-                fields = self.translate_from_vendor_field(returned_fields,
-                                                          md_request)
-                tickers = self.translate_from_vendor_ticker(returned_tickers,
-                                                            md_request)
-            except:
-                print('error')
+        try:
+            fields = self.translate_from_vendor_field(returned_fields,
+                                                      md_request)
+            tickers = self.translate_from_vendor_ticker(returned_tickers,
+                                                        md_request)
+        except:
+            print('error')
 
-            ticker_combined = []
+        ticker_combined = [tickers[i] + "." + fields[i] for i in range(len(fields))]
+        data_frame.columns = ticker_combined
+        data_frame.index.name = 'Date'
 
-            for i in range(0, len(fields)):
-                ticker_combined.append(tickers[i] + "." + fields[i])
-
-            data_frame.columns = ticker_combined
-            data_frame.index.name = 'Date'
-
-        logger.info(
-            "Completed request from ALFRED/FRED for " + str(ticker_combined))
+        logger.info(f"Completed request from ALFRED/FRED for {ticker_combined}")
 
         return data_frame
 
@@ -382,7 +353,7 @@ class DataVendorALFRED(DataVendor):
         data_frame_release = []
 
         # TODO refactor this code, a bit messy at the moment!
-        for i in range(0, len(md_request.tickers)):
+        for i in range(len(md_request.tickers)):
             while (trials < 5):
                 try:
                     fred = Fred(api_key=md_request.fred_api_key)
@@ -390,7 +361,7 @@ class DataVendorALFRED(DataVendor):
                     # acceptable fields: close, actual-release,
                     # release-date-time-full
                     if 'close' in md_request.fields and \
-                            'release-date-time-full' in md_request.fields:
+                                'release-date-time-full' in md_request.fields:
                         data_frame = fred.get_series_all_releases(
                             md_request.tickers[i],
                             observation_start=md_request.start_date,
@@ -451,7 +422,7 @@ class DataVendorALFRED(DataVendor):
                         data_frame_list.append(data_frame)
 
                     if 'actual-release' in md_request.fields and \
-                            'release-date-time-full' in md_request.fields:
+                                'release-date-time-full' in md_request.fields:
                         data_frame = fred.get_series_all_releases(
                             md_request.tickers[i],
                             observation_start=md_request.start_date,
@@ -527,10 +498,10 @@ class DataVendorALFRED(DataVendor):
 
                     break
                 except Exception as e:
-                    trials = trials + 1
-                    logger.info("Attempting... " + str(
-                        trials) + " request to download from ALFRED/FRED"
-                                + str(e))
+                    trials += 1
+                    logger.info(
+                        f"Attempting... {trials} request to download from ALFRED/FRED{str(e)}"
+                    )
 
             if trials == 5:
                 logger.error(
@@ -566,35 +537,28 @@ class DataVendorONS(DataVendor):
 
         if data_frame is None or data_frame.index is []: return None
 
-        # convert from vendor to findatapy tickers/fields
-        if data_frame is not None:
-            returned_tickers = data_frame.columns
+        returned_tickers = data_frame.columns
 
-        if data_frame is not None:
-            # tidy up tickers into a format that is more easily translatable
-            # we can often get multiple fields returned (even if we don't ask
-            # for them!)
-            # convert to lower case
-            returned_fields = [(x.split(' - ')[1]).lower().replace(' ', '-')
-                               for x in returned_tickers]
-            returned_fields = [x.replace('value', 'close') for x in
-                               returned_fields]  # special case for close
+        # tidy up tickers into a format that is more easily translatable
+        # we can often get multiple fields returned (even if we don't ask
+        # for them!)
+        # convert to lower case
+        returned_fields = [(x.split(' - ')[1]).lower().replace(' ', '-')
+                           for x in returned_tickers]
+        returned_fields = [x.replace('value', 'close') for x in
+                           returned_fields]  # special case for close
 
-            returned_tickers = [x.replace('.', '/') for x in returned_tickers]
-            returned_tickers = [x.split(' - ')[0] for x in returned_tickers]
+        returned_tickers = [x.replace('.', '/') for x in returned_tickers]
+        returned_tickers = [x.split(' - ')[0] for x in returned_tickers]
 
-            fields = self.translate_from_vendor_field(returned_fields,
-                                                      md_request)
-            tickers = self.translate_from_vendor_ticker(returned_tickers,
-                                                        md_request)
+        fields = self.translate_from_vendor_field(returned_fields,
+                                                  md_request)
+        tickers = self.translate_from_vendor_ticker(returned_tickers,
+                                                    md_request)
 
-            ticker_combined = []
-
-            for i in range(0, len(fields)):
-                ticker_combined.append(tickers[i] + "." + fields[i])
-
-            data_frame.columns = ticker_combined
-            data_frame.index.name = 'Date'
+        ticker_combined = [tickers[i] + "." + fields[i] for i in range(len(fields))]
+        data_frame.columns = ticker_combined
+        data_frame.index.name = 'Date'
 
         logger.info("Completed request from ONS.")
 
@@ -604,22 +568,19 @@ class DataVendorONS(DataVendor):
         logger = LoggerManager().getLogger(__name__)
         trials = 0
 
-        data_frame = None
-
         while (trials < 5):
             try:
                 # TODO
 
                 break
             except:
-                trials = trials + 1
-                logger.info("Attempting... " + str(
-                    trials) + " request to download from ONS")
+                trials += 1
+                logger.info(f"Attempting... {trials} request to download from ONS")
 
         if trials == 5:
             logger.error("Couldn't download from ONS after several attempts!")
 
-        return data_frame
+        return None
 
 
 ###############################################################################
@@ -642,17 +603,15 @@ class DataVendorBOE(DataVendor):
         if data_frame is None or data_frame.index is []:
             return None
 
-        # convert from vendor to findatapy tickers/fields
-        if data_frame is not None:
-            if len(md_request.fields) == 1:
-                data_frame.columns = data_frame.columns.str.cat(
-                    md_request.fields * len(data_frame.columns),
-                    sep='.')
-            else:
-                logger.warning("Inconsistent number of fields and tickers.")
-                data_frame.columns = data_frame.columns.str.cat(
-                    md_request.fields, sep='.')
-            data_frame.index.name = 'Date'
+        if len(md_request.fields) == 1:
+            data_frame.columns = data_frame.columns.str.cat(
+                md_request.fields * len(data_frame.columns),
+                sep='.')
+        else:
+            logger.warning("Inconsistent number of fields and tickers.")
+            data_frame.columns = data_frame.columns.str.cat(
+                md_request.fields, sep='.')
+        data_frame.index.name = 'Date'
 
         logger.info("Completed request from BOE.")
 
@@ -681,9 +640,8 @@ class DataVendorBOE(DataVendor):
                     index_col='DATE')
                 break
             except:
-                trials = trials + 1
-                logger.info("Attempting... " + str(
-                    trials) + " request to download from BOE")
+                trials += 1
+                logger.info(f"Attempting... {trials} request to download from BOE")
 
         if trials == 5:
             logger.error("Couldn't download from BoE after several attempts!")
@@ -717,50 +675,35 @@ class DataVendorYahoo(DataVendor):
         if data_frame is None or data_frame.index is []:
             return None
 
-        # Convert from vendor to findatapy tickers/fields
-        #if data_frame is not None:
-        #    try:
-        #        if len(md_request.tickers) > 1:
-        #            data_frame.columns = ['/'.join(col) for col in
-        #                                  data_frame.columns.values]
-        #    except:
-        #        pass
+        raw_tickers = data_frame.columns.values.tolist()
 
+        # tidy up tickers into a format that is more easily translatable
+        # we can often get multiple fields returned (even if we don't ask
+        # for them!)
+        # convert to lower case
+        # returned_fields = [(x.split(' - ')[1]).lower().replace(' ', '-')
+        # for x in returned_tickers]
+        # returned_fields = [x.replace('value', 'close') for x in
+        # returned_fields]  # special case for close
 
-        if data_frame is not None:
-            raw_tickers = data_frame.columns.values.tolist()
+        # returned_tickers = [x.replace('.', '/') for x in returned_tickers]
 
-            # tidy up tickers into a format that is more easily translatable
-            # we can often get multiple fields returned (even if we don't ask
-            # for them!)
-            # convert to lower case
-            # returned_fields = [(x.split(' - ')[1]).lower().replace(' ', '-')
-            # for x in returned_tickers]
-            # returned_fields = [x.replace('value', 'close') for x in
-            # returned_fields]  # special case for close
+        # Sometimes Yahoo tickers can have "." in them, so need to use
+        # rsplit
+        returned_tickers = [x.rsplit('.', 1)[0] for x in raw_tickers]
 
-            # returned_tickers = [x.replace('.', '/') for x in returned_tickers]
+        returned_fields = [x.rsplit('.', 1)[1] for x in
+                           raw_tickers]
 
-            # Sometimes Yahoo tickers can have "." in them, so need to use
-            # rsplit
-            returned_tickers = [x.rsplit('.', 1)[0] for x in raw_tickers]
+        tickers = self.translate_from_vendor_ticker(returned_tickers,
+                                                    md_request)
 
-            returned_fields = [x.rsplit('.', 1)[1] for x in
-                               raw_tickers]
+        fields = self.translate_from_vendor_field(returned_fields,
+                                                  md_request)
 
-            tickers = self.translate_from_vendor_ticker(returned_tickers,
-                                                        md_request)
-
-            fields = self.translate_from_vendor_field(returned_fields,
-                                                      md_request)
-
-            ticker_combined = []
-
-            for i in range(0, len(fields)):
-                ticker_combined.append(tickers[i] + "." + fields[i])
-
-            data_frame.columns = ticker_combined
-            data_frame.index.name = 'Date'
+        ticker_combined = [tickers[i] + "." + fields[i] for i in range(len(fields))]
+        data_frame.columns = ticker_combined
+        data_frame.index.name = 'Date'
 
         logger.info("Completed request from Yahoo.")
 

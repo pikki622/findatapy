@@ -19,17 +19,7 @@ __author__ = "saeedamen"  # Saeed Amen
 class CommonMan(object):
 
     def prefix_list(self, list, prefix):
-        out = []
-
-        for li in list:
-            out.append(prefix + li)
-
-        return out
+        return [prefix + li for li in list]
 
     def postfix_list(self, list, postfix):
-        out = []
-
-        for li in list:
-            out.append(li + postfix)
-
-        return out
+        return [li + postfix for li in list]

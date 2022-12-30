@@ -255,13 +255,10 @@ class DataVendor(object):
                 zip(self.get_lower_case_list(md_request.vendor_tickers),
                     md_request.tickers))
 
-            tickers_stuff = []
-
-            for vendor_ticker in vendor_tickers_list:
-                tickers_stuff.append(dictionary[vendor_ticker.lower()])
-
-            return tickers_stuff
-
+            return [
+                dictionary[vendor_ticker.lower()]
+                for vendor_ticker in vendor_tickers_list
+            ]
         # tickers_list = md_request.tickers
 
         if isinstance(vendor_tickers_list, str):

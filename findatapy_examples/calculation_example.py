@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     run_example = 0
 
-    if run_example == 1 or run_example == 0:
+    if run_example in {1, 0}:
         df_intraday = pd.DataFrame(
             index=pd.date_range(start="01 Jan 2020", end="10 Jan 2020",
                                 freq="1min"),
